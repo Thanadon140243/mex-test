@@ -1,92 +1,115 @@
-import { useState } from 'react';
-import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
-import { FaHome, FaBoxOpen, FaCreditCard, FaCog, FaChevronDown, FaChevronUp } from 'react-icons/fa';
-import Franchise from './components/ui/Franchise';
-import DashboardData from './components/ui/DashboardData';
-import Package from './components/ui/Package';
+import React, { useState } from "react";
+import './index.css';
 
-function App() {
-  const [isFranchiseOpen, setIsFranchiseOpen] = useState(false);
-  const [isCreditOpen, setIsCreditOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+const Login: React.FC = () => {
+  const [username, setUsername] = useState(""); // เก็บค่าที่ผู้ใช้กรอกในช่อง username
+  const [password, setPassword] = useState(""); // เก็บค่าที่ผู้ใช้กรอกในช่อง password
+  const [error, setError] = useState(""); // เก็บข้อความข้อผิดพลาด
+  const [loading, setLoading] = useState(false); // แสดงสถานะการโหลด
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault(); // ป้องกันการรีเฟรชหน้า
+    setLoading(true); // ตั้งสถานะการโหลดเป็น true
+    setError(""); // ล้างข้อความข้อผิดพลาดก่อนหน้า
+
+    try {
+      console.debug("Request Payload:", { username, password });
+
+      // ส่งคำขอไปยัง API
+      const response = await fetch("https://api.mexservice.la/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }), // ส่งข้อมูล username และ password
+      });
+
+      console.debug("Response Status:", response.status);
+
+      const data = await response.json();
+
+      console.debug("Response Data:", data);
+
+      if (response.ok && data.success) {
+        console.debug("Login successful:", data);
+
+        // เก็บ token ใน sessionStorage
+        sessionStorage.setItem("token", data.data.token);
+        sessionStorage.setItem("user", JSON.stringify(data.data.user));
+
+        // ตรวจสอบ rule เพื่อ redirect
+        if (data.data.user.rule === 1) {
+          window.location.href = "/homeAdmin.html"; // Redirect ไปยังหน้า admin
+        } else if (data.data.user.rule === 2) {
+          window.location.href = "/homeStore.html"; // Redirect ไปยังหน้า store
+        }
+      } else {
+        // แสดงข้อความข้อผิดพลาดจาก API
+        setError(data.message || "Login failed. Please try again.");
+      }
+    } catch (err) {
+      console.error("Error during login:", err);
+      setError("An error occurred. Please try again.");
+    } finally {
+      setLoading(false); // ตั้งสถานะการโหลดเป็น false
+    }
+  };
 
   return (
-    <Router>
-      <div className="flex min-h-screen">
-        {/* Sidebar */}
-        <div className="w-52 bg-[#840505] text-white p-4 fixed h-full">
-          <div className="flex justify-center mb-4">
-            <img src="/img/Logo1000_300.png" alt="Logo" className="w-32 h-auto" />
-          </div>
-          <div>
-            <Link to="/" className="flex items-center py-2 px-4 bg-[#E52525] rounded hover:bg-[#F73737] mb-4">
-              <FaHome className="mr-2" />
-              <span>หน้าแรก</span>
-            </Link>
-            <button
-              className="flex items-center w-full text-left py-2 px-4 bg-[#E52525] rounded hover:bg-gray-600"
-              onClick={() => setIsFranchiseOpen(!isFranchiseOpen)}
-            >
-              <FaBoxOpen className="mr-2" />
-              <span>แฟรนไซส์</span>
-              {isFranchiseOpen ? <FaChevronUp className="ml-auto" /> : <FaChevronDown className="ml-auto" />}
-            </button>
-            {isFranchiseOpen && (
-              <div className="pl-4">
-                <Link to="/package" className="block py-2 px-4 hover:bg-gray-600 rounded">แพ็ตเกจ</Link>
-                <Link to="/franchise" className="block py-2 px-4 hover:bg-gray-600 rounded">เพิ่มแฟรนไซส์</Link>
-                <Link to="/franchise-contract" className="block py-2 px-4 hover:bg-gray-600 rounded">สัญญาแฟรนไซส์</Link>
-                <Link to="/franchise-settings" className="block py-2 px-4 hover:bg-gray-600 rounded">ตั้งค่าแฟรนไซส์</Link>
-              </div>
-            )}
-          </div>
-          <div>
-            <button
-              className="flex items-center w-full text-left py-2 px-4 bg-[#E52525] rounded hover:bg-gray-600 mt-4"
-              onClick={() => setIsCreditOpen(!isCreditOpen)}
-            >
-              <FaCreditCard className="mr-2" />
-              <span>เครดิต</span>
-              {isCreditOpen ? <FaChevronUp className="ml-auto" /> : <FaChevronDown className="ml-auto" />}
-            </button>
-            {isCreditOpen && (
-              <div className="pl-4">
-                <Link to="/credit-notification" className="block py-2 px-4 hover:bg-gray-600 rounded">รับแจ้งเติมเครดิต</Link>
-                <Link to="/withdraw-credit" className="block py-2 px-4 hover:bg-gray-600 rounded">ถอนเครดิต</Link>
-                <Link to="/credit-report" className="block py-2 px-4 hover:bg-gray-600 rounded">รายงานเครดิต</Link>
-              </div>
-            )}
-          </div>
-          <div>
-            <button
-              className="flex items-center w-full text-left py-2 px-4 bg-[#E52525] rounded hover:bg-gray-600 mt-4"
-              onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-            >
-              <FaCog className="mr-2" />
-              <span>ตั้งค่าทั่วไป</span>
-              {isSettingsOpen ? <FaChevronUp className="ml-auto" /> : <FaChevronDown className="ml-auto" />}
-            </button>
-            {isSettingsOpen && (
-              <div className="pl-4">
-                <Link to="/user-groups" className="block py-2 px-4 hover:bg-gray-600 rounded">กำหนดกลุ่มผู้ใช้งาน</Link>
-                <Link to="/user-permissions" className="block py-2 px-4 hover:bg-gray-600 rounded">กำหนดสิทธิ์ผู้ใช้งาน</Link>
-              </div>
-            )}
-          </div>
+    <div className="flex items-center justify-center min-h-screen login-background">
+      <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-md">
+	<div className="flex justify-center mb-6">
+          <img
+            src="/img/Logo1000_300_red.png"
+            alt="Logo"
+            className="w-48 h-auto"
+          />
         </div>
-
-        {/* Main Content */}
-        <div className="flex-1 p-4 ml-52">
-          <Routes>
-            <Route path="/franchise" element={<Franchise />} />
-            <Route path="/package" element={<Package />} />
-            <Route path="/" element={<DashboardData />} />
-            {/* Add other routes here */}
-          </Routes>
-        </div>
+        <form onSubmit={handleLogin}>
+          <div className="mb-4">
+            <label
+              htmlFor="username"
+              className="block mb-2 text-sm font-medium text-gray-600"
+            >
+              Username
+            </label>
+            <input
+              type="text"
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)} // อัปเดตค่า username
+              className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="Enter your username"
+            />
+          </div>
+          <div className="mb-4">
+            <label
+              htmlFor="password"
+              className="block mb-2 text-sm font-medium text-gray-600"
+            >
+              Password
+            </label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)} // อัปเดตค่า password
+              className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="Enter your password"
+            />
+          </div>
+          {error && <p className="mb-4 text-sm text-red-500">{error}</p>}
+          <button
+            type="submit"
+            className="w-full px-4 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600"
+            disabled={loading}
+          >
+            {loading ? "Logging in..." : "Login"}
+          </button>
+        </form>
       </div>
-    </Router>
+    </div>
   );
-}
+};
 
-export default App;
+export default Login;

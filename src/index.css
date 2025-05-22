@@ -80,3 +80,8 @@ body{
   background: url('/img/map.png') no-repeat center center fixed;
   background-size: cover;
 }
+
+.login-background {
+  background: url('/img/map.png') no-repeat center center fixed;
+  background-size: cover;
+}

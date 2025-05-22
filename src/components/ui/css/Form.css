@@ -1,3 +1,15 @@
+/* ปิดลูกศรขึ้นลงใน input type="number" */
+input[type="number"] {
+    -moz-appearance: textfield; /* สำหรับ Firefox */
+    appearance: none; /* สำหรับเบราว์เซอร์อื่น */
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none; /* สำหรับ Chrome, Safari */
+    margin: 0; /* ลบ margin */
+}
+
 .switch {
     position: relative;
     display: inline-block;
