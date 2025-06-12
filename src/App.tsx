@@ -1,99 +1,94 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import './index.css';
 
 const Login: React.FC = () => {
-  const [username, setUsername] = useState(""); // เก็บค่าที่ผู้ใช้กรอกในช่อง username
-  const [password, setPassword] = useState(""); // เก็บค่าที่ผู้ใช้กรอกในช่อง password
-  const [error, setError] = useState(""); // เก็บข้อความข้อผิดพลาด
-  const [loading, setLoading] = useState(false); // แสดงสถานะการโหลด
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [checkingToken, setCheckingToken] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const user = localStorage.getItem("user");
+    if (token && user) {
+      try {
+        const userObj = JSON.parse(user);
+        if (userObj.rule === 1) {
+          window.location.href = "/homeAdmin.html";
+        } else if (userObj.rule === 2) {
+          window.location.href = "/homeStore.html";
+        }
+        return;
+      } catch {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+      }
+    }
+    setCheckingToken(false);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault(); // ป้องกันการรีเฟรชหน้า
-    setLoading(true); // ตั้งสถานะการโหลดเป็น true
-    setError(""); // ล้างข้อความข้อผิดพลาดก่อนหน้า
-
+    e.preventDefault();
+    setLoading(true);
+    setError("");
     try {
-      console.debug("Request Payload:", { username, password });
-
-      // ส่งคำขอไปยัง API
       const response = await fetch("https://api.mexservice.la/api/auth/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, password }), // ส่งข้อมูล username และ password
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, countryCode: "+85" }),
       });
-
-      console.debug("Response Status:", response.status);
-
       const data = await response.json();
-
-      console.debug("Response Data:", data);
-
       if (response.ok && data.success) {
-        console.debug("Login successful:", data);
-
-        // เก็บ token ใน sessionStorage
-        sessionStorage.setItem("token", data.data.token);
-        sessionStorage.setItem("user", JSON.stringify(data.data.user));
-
-        // ตรวจสอบ rule เพื่อ redirect
+        localStorage.setItem("token", data.data.token);
+        localStorage.setItem("user", JSON.stringify(data.data.user));
+        localStorage.setItem("countryCode", "+85");
         if (data.data.user.rule === 1) {
-          window.location.href = "/homeAdmin.html"; // Redirect ไปยังหน้า admin
+          window.location.href = "/homeAdmin.html";
         } else if (data.data.user.rule === 2) {
-          window.location.href = "/homeStore.html"; // Redirect ไปยังหน้า store
+          window.location.href = "/homeStore.html";
         }
       } else {
-        // แสดงข้อความข้อผิดพลาดจาก API
         setError(data.message || "Login failed. Please try again.");
       }
-    } catch (err) {
-      console.error("Error during login:", err);
+    } catch {
       setError("An error occurred. Please try again.");
     } finally {
-      setLoading(false); // ตั้งสถานะการโหลดเป็น false
+      setLoading(false);
     }
   };
+
+  if (checkingToken) return null;
 
   return (
     <div className="flex items-center justify-center min-h-screen login-background">
       <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-md">
-	<div className="flex justify-center mb-6">
-          <img
-            src="/img/Logo1000_300_red.png"
-            alt="Logo"
-            className="w-48 h-auto"
-          />
+        <div className="flex justify-center mb-6">
+          <img src="/img/Logo1000_300_red.png" alt="Logo" className="w-48 h-auto" />
         </div>
         <form onSubmit={handleLogin}>
           <div className="mb-4">
-            <label
-              htmlFor="username"
-              className="block mb-2 text-sm font-medium text-gray-600"
-            >
+            <label htmlFor="username" className="block mb-2 text-sm font-medium text-gray-600">
               Username
             </label>
             <input
               type="text"
               id="username"
               value={username}
-              onChange={(e) => setUsername(e.target.value)} // อัปเดตค่า username
+              onChange={(e) => setUsername(e.target.value)}
               className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
               placeholder="Enter your username"
             />
           </div>
           <div className="mb-4">
-            <label
-              htmlFor="password"
-              className="block mb-2 text-sm font-medium text-gray-600"
-            >
+            <label htmlFor="password" className="block mb-2 text-sm font-medium text-gray-600">
               Password
             </label>
             <input
               type="password"
               id="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)} // อัปเดตค่า password
+              onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
               placeholder="Enter your password"
             />

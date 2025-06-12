@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router, Route, Routes, Link, Navigate } from 'react-router-dom';
 import { FaHome, FaTruck, FaMoneyCheckAlt, FaGamepad, FaShoppingCart, FaChartBar, FaCog, FaChevronDown, FaChevronUp, FaSignOutAlt } from 'react-icons/fa';
 import DashboardDataStore from './components/ui/DashboardDataStore';
@@ -9,9 +9,17 @@ const HomeStore: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const handleLogout = () => {
-    // เปลี่ยนเส้นทางกลับไปยัง index.html
-    window.location.href = "/index.html";
-  };
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/index.html";
+    };
+  
+    useEffect(() => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        window.location.href = "/index.html";
+      }
+    }, []);
 
   return (
     <Router>

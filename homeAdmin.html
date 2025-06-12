@@ -17,10 +17,7 @@
 
 <body>
   <script>
-    const token = sessionStorage.getItem("token");
-
-    if (!token) {
-      // Redirect ไปยังหน้า Login ถ้าไม่มี Token
+    if (!localStorage.getItem("token")) {
       window.location.href = "/index.html";
     }
   </script>

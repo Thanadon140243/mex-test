@@ -13,13 +13,13 @@ const Home: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const handleLogout = () => {
-    sessionStorage.removeItem("token");
-    sessionStorage.removeItem("user");
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
     window.location.href = "/index.html";
   };
 
   useEffect(() => {
-    const token = sessionStorage.getItem("token");
+    const token = localStorage.getItem("token");
 
     if (!token) {
       // ถ้าไม่มี Token ให้ Redirect ไปยังหน้า Login
