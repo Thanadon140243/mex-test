@@ -1,32 +1,29 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import './index.css';
 
 const Login: React.FC = () => {
-  const [username, setUsername] = useState("");
+   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [checkingToken, setCheckingToken] = useState(true);
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    const user = localStorage.getItem("user");
-    if (token && user) {
-      try {
-        const userObj = JSON.parse(user);
-        if (userObj.rule === 1) {
-          window.location.href = "/homeAdmin.html";
-        } else if (userObj.rule === 2) {
-          window.location.href = "/homeStore.html";
-        }
-        return;
-      } catch {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+  // เช็ค token ก่อน render
+  const token = localStorage.getItem("token");
+  const user = localStorage.getItem("user");
+  if (token && user) {
+    try {
+      const userObj = JSON.parse(user);
+      if (userObj.rule === 1) {
+        window.location.href = "/homeAdmin.html";
+      } else if (userObj.rule === 2) {
+        window.location.href = "/homeStore.html";
       }
+      return null;
+    } catch {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
     }
-    setCheckingToken(false);
-  }, []);
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,13 +33,13 @@ const Login: React.FC = () => {
       const response = await fetch("https://api.mexservice.la/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password, countryCode: "+85" }),
+        body: JSON.stringify({ username, password, countryCode: "+66" }),
       });
       const data = await response.json();
       if (response.ok && data.success) {
         localStorage.setItem("token", data.data.token);
         localStorage.setItem("user", JSON.stringify(data.data.user));
-        localStorage.setItem("countryCode", "+85");
+        localStorage.setItem("countryCode", "+66");
         if (data.data.user.rule === 1) {
           window.location.href = "/homeAdmin.html";
         } else if (data.data.user.rule === 2) {
@@ -57,8 +54,6 @@ const Login: React.FC = () => {
       setLoading(false);
     }
   };
-
-  if (checkingToken) return null;
 
   return (
     <div className="flex items-center justify-center min-h-screen login-background">

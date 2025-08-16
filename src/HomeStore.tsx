@@ -1,25 +1,25 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { BrowserRouter as Router, Route, Routes, Link, Navigate } from 'react-router-dom';
 import { FaHome, FaTruck, FaMoneyCheckAlt, FaGamepad, FaShoppingCart, FaChartBar, FaCog, FaChevronDown, FaChevronUp, FaSignOutAlt } from 'react-icons/fa';
 import DashboardDataStore from './components/ui/DashboardDataStore';
-import ShippingAdd from './components/ui/ShippingAdd'; // Import ShippingAdd
+import ShippingAdd from './components/ui/ShippingAdd';
 
 const HomeStore: React.FC = () => {
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+  // เช็ค token ก่อน render
+  const token = localStorage.getItem("token");
+  if (!token) {
+    window.location.href = "/index.html";
+    return null;
+  }
+
   const handleLogout = () => {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.location.href = "/index.html";
-    };
-  
-    useEffect(() => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        window.location.href = "/index.html";
-      }
-    }, []);
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    window.location.href = "/index.html";
+  };
 
   return (
     <Router>
@@ -94,7 +94,6 @@ const HomeStore: React.FC = () => {
         {/* Main Content */}
         <div className="flex-1 p-4 ml-52">
           <Routes>
-            {/* ตั้งค่าให้ path "/" แสดง DashboardDataStore */}
             <Route path="/" element={<DashboardDataStore />} />
             <Route path="/transport" element={<ShippingAdd />} />
             <Route path="/transfer" element={<></>} />
@@ -102,7 +101,6 @@ const HomeStore: React.FC = () => {
             <Route path="/shopping" element={<></>} />
             <Route path="/sales-report" element={<></>} />
             <Route path="/user-settings" element={<></>} />
-            {/* Redirect หาก path ไม่ตรง */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

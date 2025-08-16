@@ -1,0 +1,9 @@
+# nginx-docker-demo/docker-compose.yml
+
+version: '3'
+services:
+  web:
+    build: .
+    ports:
+      - "8080:80"
+    container_name: nginx-demo

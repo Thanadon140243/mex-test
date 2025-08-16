@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>📋 โครงสร้างใบประหน้าพัสดุ MEX Service</title>
+    <style>
+        body {
+            font-family: 'Sarabun', Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+            margin: 0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header-section {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .content-section {
+            padding: 30px;
+        }
+        .layout-demo {
+            display: flex;
+            gap: 30px;
+            margin: 30px 0;
+        }
+        .structure-info {
+            flex: 1;
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        .visual-demo {
+            flex: 1;
+        }
+        
+        /* Demo ใบประหน้า */
+        .label-demo {
+            width: 95mm;
+            height: auto;
+            border: 3px solid #000;
+            position: relative;
+            background: white;
+            margin: 0 auto;
+            font-size: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .demo-header {
+            background: #000;
+            color: white;
+            padding: 8px 12px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .demo-logo {
+            width: 35px;
+            height: 35px;
+            background: #666;
+            border-radius: 50%;
+            margin-right: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 8px;
+            font-weight: bold;
+        }
+        
+        .demo-destination {
+            flex: 1;
+            text-align: center;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        /* บาร์โค้ดด้านขวา */
+        .demo-barcode {
+            position: absolute;
+            right: 2px;
+            top: 50px;
+            bottom: 2px;
+            width: 40px;
+            background: #e3f2fd;
+            border-left: 2px solid #1976d2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            color: #1976d2;
+            font-weight: bold;
+        }
+        
+        /* Branch Code */
+        .demo-branch {
+            position: absolute;
+            right: 44px;
+            top: 50px;
+            background: #000;
+            color: white;
+            writing-mode: vertical-rl;
+            padding: 8px 4px;
+            font-weight: bold;
+            font-size: 10px;
+        }
+        
+        /* เนื้อหา */
+        .demo-content {
+            margin: 0 50px 0 8px;
+            padding: 8px 0;
+        }
+        
+        .demo-tracking {
+            background: #f0f8ff;
+            padding: 6px;
+            text-align: center;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 4px;
+        }
+        
+        .demo-section {
+            padding: 4px 6px;
+            border-bottom: 1px solid #eee;
+            font-size: 9px;
+            line-height: 1.3;
+        }
+        
+        .demo-section:last-child {
+            border-bottom: none;
+            background: #f8f9fa;
+            text-align: center;
+            font-size: 8px;
+        }
+        
+        .highlight-box {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .problem-box {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .solution-box {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .dimensions {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .dimension-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        
+        .dimension-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 5px;
+        }
+        
+        .code-snippet {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-section">
+            <h1>📋 โครงสร้างใบประหน้าพัสดุ MEX Service</h1>
+            <p>การวิเคราะห์และแก้ไขปัญหาการแสดงผล Barcode</p>
+        </div>
+        
+        <div class="content-section">
+            
+            <div class="layout-demo">
+                <div class="structure-info">
+                    <h3>🏗️ โครงสร้างหลักของใบประหน้า</h3>
+                    
+                    <h4>📐 ขนาดและตำแหน่ง:</h4>
+                    <div class="dimensions">
+                        <div class="dimension-card">
+                            <div class="dimension-value">95mm</div>
+                            <div>ความกว้าง</div>
+                        </div>
+                        <div class="dimension-card">
+                            <div class="dimension-value">50px</div>
+                            <div>บาร์โค้ดพื้นที่</div>
+                        </div>
+                        <div class="dimension-card">
+                            <div class="dimension-value">55px</div>
+                            <div>Margin เนื้อหา</div>
+                        </div>
+                    </div>
+                    
+                    <h4>🧱 องค์ประกอบหลัก:</h4>
+                    <ol style="line-height: 1.8;">
+                        <li><strong>Header (ส่วนหัว):</strong> โลโก้ + ชื่อ destination</li>
+                        <li><strong>Barcode Section:</strong> บาร์โค้ดแนวตั้งด้านขวา</li>
+                        <li><strong>Branch Code:</strong> รหัสสาขาแนวตั้ง</li>
+                        <li><strong>Tracking Code:</strong> หมายเลขพัสดุ</li>
+                        <li><strong>Info Sections:</strong> ข้อมูลผู้ส่ง/ผู้รับ</li>
+                        <li><strong>Footer:</strong> ข้อมูลติดต่อ</li>
+                    </ol>
+                    
+                    <div class="highlight-box">
+                        <strong>🎯 จุดสำคัญ:</strong> บาร์โค้ดต้องอยู่ใน <code>.barcode-vertical</code> ที่มีตำแหน่ง:
+                        <ul style="margin: 10px 0 0 20px;">
+                            <li><code>position: absolute</code></li>
+                            <li><code>right: 2px</code></li>
+                            <li><code>top: 65px</code></li>
+                            <li><code>width: 50px</code></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="visual-demo">
+                    <h3>👁️ ตัวอย่างใบประหน้า</h3>
+                    <div class="label-demo">
+                        <!-- Header -->
+                        <div class="demo-header">
+                            <div class="demo-logo">MEX</div>
+                            <div class="demo-destination">Mixay Express</div>
+                        </div>
+                        
+                        <!-- Barcode -->
+                        <div class="demo-barcode">
+                            <div style="transform: rotate(90deg); font-size: 6px;">BARCODE</div>
+                            <div style="margin-top: 10px;">AREA</div>
+                        </div>
+                        
+                        <!-- Branch Code -->
+                        <div class="demo-branch">M553</div>
+                        
+                        <!-- Content -->
+                        <div class="demo-content">
+                            <div class="demo-tracking">
+                                <div style="font-weight: bold; font-size: 8px;">หมายเลขพัสดุ</div>
+                                <div style="font-weight: bold; font-size: 10px;">MX123456789</div>
+                            </div>
+                            
+                            <div class="demo-section">
+                                <strong>ผู้รับ:</strong> นาย ทดสอบ | <strong>โทร:</strong> 098-xxx-xxxx<br>
+                                <strong>ปลายทาง:</strong> กรุงเทพฯ ประเทศไทย
+                            </div>
+                            
+                            <div class="demo-section">
+                                <strong>ผู้ส่ง:</strong> บริษัท MEX | <strong>โทร:</strong> 021-xxx-xxx<br>
+                                <strong>ต้นทาง:</strong> เวียงจันทน์ ลาว
+                            </div>
+                            
+                            <div class="demo-section">
+                                <strong>พัสดุจ่ายต้นทาง</strong><br>
+                                L: 30 cm | W: 20 cm | H: 15 cm<br>
+                                น้ำหนัก: 2.5 Kg | ค่าจัดส่ง: 125 บาท
+                            </div>
+                            
+                            <div class="demo-section">
+                                ออกโดย: พนักงาน MEX<br>
+                                ติดต่อ: +66 65 338 8543<br>
+                                13/07/2025 14:30
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="problem-box">
+                <h3>❌ ปัญหาที่พบ</h3>
+                <ul>
+                    <li><strong>บาร์โค้ดไม่แสดงผล:</strong> SVG ไม่ render ถูกต้องในพื้นที่ที่กำหนด</li>
+                    <li><strong>ขนาดไม่เหมาะสม:</strong> บาร์โค้ดเล็กเกินไปและไม่สวยงาม</li>
+                    <li><strong>ตำแหน่งไม่ตรง:</strong> บาร์โค้ดไม่อยู่ในพื้นที่ที่เตรียมไว้</li>
+                    <li><strong>การหมุน 90 องศา:</strong> ทำให้ข้อความในบาร์โค้ดไม่แสดงผลถูกต้อง</li>
+                </ul>
+            </div>
+            
+            <div class="solution-box">
+                <h3>✅ วิธีแก้ไข</h3>
+                <ol>
+                    <li><strong>ปรับขนาด SVG:</strong> ให้ตรงกับพื้นที่ .barcode-vertical (50px width)</li>
+                    <li><strong>ปรับ viewBox:</strong> ให้สัดส่วนเหมาะสมกับการหมุน 90 องศา</li>
+                    <li><strong>ปรับ CSS:</strong> ให้ .barcode-svg รองรับขนาดใหม่</li>
+                    <li><strong>ทดสอบการแสดงผล:</strong> ใน environment จริง</li>
+                </ol>
+            </div>
+            
+            <h3>🔧 การแก้ไขที่แนะนำ</h3>
+            
+            <h4>1. ปรับขนาด Barcode SVG ให้เหมาะสม:</h4>
+            <div class="code-snippet">
+// ขนาดที่เหมาะสมสำหรับพื้นที่ 50px width
+const svgHTML = `&lt;svg width="48" height="180" viewBox="0 0 ${totalWidth} ${totalHeight}" 
+    style="transform: rotate(90deg); background: white;"&gt;
+  ...
+&lt;/svg&gt;`;
+            </div>
+            
+            <h4>2. ปรับ CSS ให้รองรับ:</h4>
+            <div class="code-snippet">
+.barcode-svg {
+  width: 48px;
+  height: 95%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.barcode-svg svg {
+  width: 100%;
+  height: 100%;
+  max-height: 180px;
+}
+            </div>
+            
+            <h4>3. ลบข้อความที่หมุนไม่ถูกต้อง:</h4>
+            <div class="code-snippet">
+// เอาข้อความออกจากบาร์โค้ดที่หมุน หรือปรับให้แสดงผลถูกต้อง
+// เพราะเมื่อ SVG หมุน 90 องศา ข้อความจะไม่อ่านได้
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0; padding: 20px; background: #e8f5e8; border-radius: 8px;">
+                <h3 style="color: #2e7d32; margin-bottom: 10px;">🎯 เป้าหมาย</h3>
+                <p style="margin: 0; color: #1b5e20;">ให้บาร์โค้ดแสดงผลอย่างสมบูรณ์ในพื้นที่ที่เตรียมไว้ ด้านขวาของใบประหน้า โดยมีขนาดที่เหมาะสมและสวยงาม</p>
+            </div>
+            
+        </div>
+    </div>
+</body>
+</html>

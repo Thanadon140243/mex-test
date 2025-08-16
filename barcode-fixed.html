@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>🎯 ทดสอบ Barcode ที่ปรับปรุงแล้ว</title>
+    <style>
+        body {
+            font-family: 'Sarabun', Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+        }
+        .success-banner {
+            background: linear-gradient(135deg, #28a745, #34ce57);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .demo-section {
+            display: flex;
+            gap: 30px;
+            margin: 30px 0;
+        }
+        .demo-before, .demo-after {
+            flex: 1;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .demo-before {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        .demo-after {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+        }
+        .barcode-demo {
+            text-align: center;
+            padding: 20px;
+            background: white;
+            border-radius: 6px;
+            margin: 15px 0;
+            border: 1px solid #ddd;
+        }
+        .improvements {
+            background: #e8f5e8;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #28a745;
+            margin: 20px 0;
+        }
+        .code-preview {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-banner">
+            <h1>🎯 Barcode ปรับปรุงเสร็จสิ้น!</h1>
+            <p>บาร์โค้ดตอนนี้ถูกปรับให้เหมาะสมกับพื้นที่ที่เตรียมไว้ในใบประหน้าแล้ว</p>
+        </div>
+        
+        <div class="improvements">
+            <h3>✅ การปรับปรุงที่ทำเสร็จแล้ว:</h3>
+            <ul>
+                <li><strong>📐 ขนาดที่เหมาะสม:</strong> SVG width: 48px height: 180px (พอดีกับพื้นที่ 50px)</li>
+                <li><strong>🔄 การหมุน:</strong> transform: rotate(90deg) ทำงานถูกต้อง</li>
+                <li><strong>🎨 ไม่มีข้อความ:</strong> ลบข้อความที่จะหมุนไปด้วยออกแล้ว</li>
+                <li><strong>📍 ตำแหน่งถูกต้อง:</strong> อยู่ในพื้นที่ .barcode-vertical ที่เตรียมไว้</li>
+                <li><strong>💾 Fallback ที่ดี:</strong> กรณีเกิดข้อผิดพลาดจะแสดงบาร์โค้ดสำรอง</li>
+            </ul>
+        </div>
+        
+        <div class="demo-section">
+            <div class="demo-before">
+                <h3>❌ ก่อนแก้ไข</h3>
+                <ul style="font-size: 14px; line-height: 1.6;">
+                    <li>ขนาดใหญ่เกินไป (50x200px)</li>
+                    <li>มีข้อความที่หมุนผิด</li>
+                    <li>ไม่พอดีกับพื้นที่</li>
+                    <li>อาจไม่แสดงผลในบางกรณี</li>
+                </ul>
+                
+                <div class="barcode-demo">
+                    <div style="color: #721c24;">❌ Barcode เก่า (ใหญ่เกินไป)</div>
+                    <div style="background: #f8d7da; padding: 10px; margin: 10px 0; font-size: 12px;">
+                        width: 50px, height: 200px<br>
+                        + ข้อความที่หมุนผิด
+                    </div>
+                </div>
+            </div>
+            
+            <div class="demo-after">
+                <h3>✅ หลังแก้ไข</h3>
+                <ul style="font-size: 14px; line-height: 1.6;">
+                    <li>ขนาดพอดี (48x180px)</li>
+                    <li>ไม่มีข้อความที่หมุนผิด</li>
+                    <li>พอดีกับพื้นที่ที่กำหนด</li>
+                    <li>แสดงผลเสถียร</li>
+                </ul>
+                
+                <div class="barcode-demo">
+                    <div style="color: #0c5460;">✅ Barcode ใหม่ (พอดี)</div>
+                    <div id="new-barcode"></div>
+                    <div style="color: #666; font-size: 12px; margin-top: 10px;">
+                        width: 48px, height: 180px
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <h3>🔧 โค้ดที่ปรับปรุง:</h3>
+        <div class="code-preview">
+// ขนาดที่ปรับปรุงแล้ว
+const svgHTML = `&lt;svg width="48" height="180" viewBox="0 0 ${totalWidth} ${barHeight}" 
+    style="transform: rotate(90deg); background: white;"&gt;
+  &lt;rect x="0" y="0" width="${totalWidth}" height="${barHeight}" fill="white"/&gt;
+  &lt;rect x="2" y="2" width="${totalWidth - 4}" height="${barHeight - 4}" 
+        fill="none" stroke="#ddd" stroke-width="1"/&gt;
+  ${bars}
+  &lt;!-- ไม่ใส่ text เพราะจะหมุนไปด้วย --&gt;
+&lt;/svg&gt;`;
+        </div>
+        
+        <h3>📋 CSS ที่รองรับ:</h3>
+        <div class="code-preview">
+.barcode-vertical {
+  position: absolute;
+  right: 2px;
+  top: 65px;
+  bottom: 2px;
+  width: 50px;    /* พื้นที่ที่เตรียมไว้ */
+  /* ... */
+}
+
+.barcode-svg {
+  width: 48px;    /* พอดีกับพื้นที่ */
+  height: 95%;
+  /* ... */
+}
+
+.barcode-svg svg {
+  width: 100%;
+  height: 100%;
+  max-height: 180px;  /* ควบคุมความสูงสูงสุด */
+}
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #e8f5e8, #d4edda); border-radius: 8px; border: 1px solid #c3e6cb;">
+            <h3 style="color: #155724; margin-bottom: 15px;">🚀 พร้อมใช้งาน!</h3>
+            <p style="margin: 0; color: #1b5e20; font-size: 16px;">
+                บาร์โค้ดตอนนี้จะแสดงผลอย่างสมบูรณ์ในใบประหน้าพัสดุ MEX Service<br>
+                ในตำแหน่งที่เตรียมไว้ด้านขวาของใบประหน้า
+            </p>
+        </div>
+    </div>
+    
+    <script>
+        // สร้าง demo barcode ใหม่
+        function generateNewBarcode(text) {
+            const cleanText = text.replace(/[^A-Z0-9]/g, '').substring(0, 12);
+            const finalText = cleanText || 'DEFAULT';
+            const barWidth = 2;
+            const spacing = 1;
+            const barHeight = 180;
+            
+            let bars = '';
+            let currentX = 0;
+            
+            // Start pattern
+            bars += `<rect x="${currentX}" y="0" width="${barWidth * 2}" height="${barHeight}" fill="black"/>`;
+            currentX += (barWidth * 2) + spacing;
+            bars += `<rect x="${currentX}" y="0" width="${barWidth}" height="${barHeight}" fill="black"/>`;
+            currentX += barWidth + spacing;
+            bars += `<rect x="${currentX}" y="0" width="${barWidth * 2}" height="${barHeight}" fill="black"/>`;
+            currentX += (barWidth * 2) + (spacing * 3);
+            
+            // Data bars
+            for (let i = 0; i < finalText.length; i++) {
+                const char = finalText[i];
+                const charCode = char.charCodeAt(0);
+                
+                const pattern = [
+                    (charCode % 4) + 1,
+                    ((charCode + 1) % 3) + 1,
+                    ((charCode + 2) % 4) + 1,
+                    ((charCode + 3) % 3) + 1,
+                    ((charCode + 4) % 4) + 1,
+                    ((charCode + 5) % 3) + 1
+                ];
+                
+                for (let j = 0; j < pattern.length; j++) {
+                    const barThickness = pattern[j] * barWidth;
+                    if (j % 2 === 0) {
+                        bars += `<rect x="${currentX}" y="0" width="${barThickness}" height="${barHeight}" fill="black"/>`;
+                    }
+                    currentX += barThickness;
+                }
+                
+                currentX += spacing * 2;
+            }
+            
+            // End pattern
+            currentX += spacing * 2;
+            bars += `<rect x="${currentX}" y="0" width="${barWidth * 2}" height="${barHeight}" fill="black"/>`;
+            currentX += (barWidth * 2) + spacing;
+            bars += `<rect x="${currentX}" y="0" width="${barWidth}" height="${barHeight}" fill="black"/>`;
+            currentX += barWidth + spacing;
+            bars += `<rect x="${currentX}" y="0" width="${barWidth * 2}" height="${barHeight}" fill="black"/>`;
+            currentX += (barWidth * 2);
+            
+            const totalWidth = currentX + 10;
+            
+            return `<svg width="48" height="180" viewBox="0 0 ${totalWidth} ${barHeight}" style="transform: rotate(90deg); background: white; border: 1px solid #ddd;">
+              <rect x="0" y="0" width="${totalWidth}" height="${barHeight}" fill="white"/>
+              <rect x="2" y="2" width="${totalWidth - 4}" height="${barHeight - 4}" fill="none" stroke="#ddd" stroke-width="1"/>
+              ${bars}
+            </svg>`;
+        }
+        
+        // แสดง demo
+        document.getElementById('new-barcode').innerHTML = generateNewBarcode('MX987654321');
+    </script>
+</body>
+</html>

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>🧪 Demo บาร์โค้ดใหม่ - แถบยาวด้านขวา</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap');
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+         <h3>🎯 ผลลัพธ์ที่ได้:</h3>
+      <div class="feature-list">
+        <ul>
+          <li>📍 <strong>ตำแหน่งตรงกลาง:</strong> บาร์โค้ดอยู่ตรงกลางแนวตั้งของใบประหน้า</li>
+          <li>🔢 <strong>หมายเลขข้างๆ:</strong> หมายเลขพัสดุแสดงข้างๆ บาร์โค้ดในแนวตั้ง</li>
+          <li>📏 <strong>ขนาดกะทัดรัด:</strong> บาร์โค้ด 32px + หมายเลข 12px = พอดี 50px</li>
+          <li>📍 <strong>ตำแหน่งขวาสุด:</strong> ติดขอบขวาของใบประหน้าพอดี</li>
+          <li>🔄 <strong>หมุนในแนวตั้ง:</strong> สามารถอ่านและสแกนได้ง่าย</li>
+          <li>🖼️ <strong>ไม่รบกวนเนื้อหา:</strong> ข้อมูลอื่นๆ จัดเรียงอย่างเป็นระเบียบ</li>
+          <li>🖨️ <strong>เหมาะสำหรับพิมพ์:</strong> ขนาดและตำแหน่งที่เหมาะสำหรับการพิมพ์และสแกน</li>
+        </ul>
+      </div>ly: 'Sarabun', 'Tahoma', Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.4;
+      color: #000;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+    
+    .demo-container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .demo-title {
+      text-align: center;
+      font-size: 24px;
+      font-weight: 800;
+      color: #2c3e50;
+      margin-bottom: 20px;
+      border-bottom: 3px solid #27ae60;
+      padding-bottom: 10px;
+    }
+    
+    .label-container {
+      width: 380px;
+      max-width: 380px;
+      border: 2px solid #000;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 11px;
+      position: relative;
+      background: white;
+      margin: 20px auto;
+      height: 500px;
+    }
+    
+    /* Header Section */
+    .header {
+      display: flex;
+      align-items: center;
+      background: #000;
+      color: white;
+      padding: 8px 12px;
+      height: 55px;
+    }
+    
+    .logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 2px solid white;
+      margin-right: 10px;
+      background: #3498db;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 12px;
+    }
+    
+    .destination {
+      flex: 1;
+      text-align: center;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: 1px;
+    }
+    
+    /* Barcode Section - แนวตั้งด้านขวา อยู่ตรงกลาง */
+    .barcode-vertical {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 50px;
+      height: 280px;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      z-index: 10;
+      border-left: 2px solid #000;
+      box-shadow: inset 2px 0 4px rgba(0,0,0,0.1);
+      gap: 4px;
+    }
+    
+    .barcode-svg {
+      width: 32px;
+      height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: visible;
+      padding: 0;
+    }
+    
+    .barcode-svg svg {
+      width: 32px;
+      height: 180px;
+    }
+    
+    .barcode-number {
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      font-size: 7px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: #000;
+      background: white;
+      padding: 2px 1px;
+      border: 1px solid #ddd;
+      border-radius: 2px;
+      line-height: 1;
+      width: 12px;
+      text-align: center;
+    }
+    
+    /* Tracking Code Section */
+    .tracking-code-section {
+      padding: 6px 8px;
+      border-bottom: 1px solid #ddd;
+      font-size: 11px;
+      line-height: 1.4;
+      background: #f0f8ff;
+      margin-right: 52px;
+      text-align: center;
+    }
+    
+    .tracking-code-label {
+      font-weight: 800;
+      color: #000;
+      margin-bottom: 2px;
+    }
+    
+    .tracking-code-value {
+      font-weight: 900;
+      font-size: 13px;
+      letter-spacing: 1px;
+      color: #000;
+    }
+    
+    /* Branch Code Vertical */
+    .branch-code-vertical {
+      position: absolute;
+      right: 52px;
+      top: 65px;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      background: #000;
+      color: white;
+      padding: 8px 4px;
+      font-weight: 900;
+      font-size: 16px;
+      letter-spacing: 2px;
+      z-index: 5;
+      border-radius: 0 0 0 4px;
+    }
+    
+    /* Info Sections */
+    .info-section {
+      padding: 6px 8px;
+      border-bottom: 1px solid #ddd;
+      font-size: 11px;
+      line-height: 1.4;
+      background: white;
+      margin-right: 52px;
+    }
+    
+    .info-section:last-child {
+      border-bottom: none;
+    }
+    
+    .info-label {
+      font-weight: 800;
+      color: #000;
+    }
+    
+    .info-value {
+      color: #000;
+      word-wrap: break-word;
+      font-weight: 600;
+    }
+    
+    .explanation {
+      background: #e8f4fd;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 20px 0;
+      border-left: 4px solid #3498db;
+    }
+    
+    .explanation h3 {
+      color: #2c3e50;
+      margin-bottom: 10px;
+    }
+    
+    .feature-list {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 15px 0;
+    }
+    
+    .feature-list ul {
+      margin-left: 20px;
+    }
+    
+    .feature-list li {
+      margin: 5px 0;
+      color: #2c3e50;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-container">
+    <div class="demo-title">🎯 บาร์โค้ดใหม่ - ตรงกลาง + หมายเลขกำกับ</div>
+    
+    <div class="explanation">
+      <h3>🔧 การปรับปรุงที่ทำ:</h3>
+      <div class="feature-list">
+        <ul>
+          <li>✅ <strong>ตำแหน่งตรงกลาง:</strong> บาร์โค้ดอยู่ตรงกลางแนวตั้งของใบประหน้า</li>
+          <li>✅ <strong>หมายเลขข้างๆ:</strong> แสดงหมายเลขพัสดุข้างๆ บาร์โค้ด ไม่ใช่ต่อท้าย</li>
+          <li>✅ <strong>Layout แนวนอน:</strong> ใช้ flex-direction: row แทน column</li>
+          <li>✅ <strong>ประหยัดพื้นที่:</strong> บาร์โค้ด 32px + หมายเลข 12px = รวม 48px</li>
+          <li>✅ <strong>ขนาดเหมาะสม:</strong> 32x180px สำหรับการสแกนที่ดี</li>
+          <li>✅ <strong>ฟอนต์ชัดเจน:</strong> หมายเลขกำกับขนาด 7px แต่ชัดเจน</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="label-container">
+      
+      <!-- Header -->
+      <div class="header">
+        <div class="logo">MEX</div>
+        <div class="destination">ลาดกระบัง → มีนบุรี</div>
+      </div>
+
+      <!-- Barcode แนวตั้งด้านขวา -->
+      <div class="barcode-vertical">
+        <div class="barcode-svg">
+          <svg width="32" height="180" viewBox="0 0 32 180" style="background: white;">
+            <rect x="0" y="0" width="32" height="180" fill="white"/>
+            <!-- Border frame -->
+            <rect x="1" y="2" width="30" height="176" fill="none" stroke="#ddd" stroke-width="1"/>
+            <!-- Vertical barcode pattern -->
+            <g transform="translate(16, 10) rotate(90)">
+              <g transform="translate(-50, -16)">
+                <!-- Start pattern -->
+                <rect x="0" y="0" width="4" height="10" fill="black"/>
+                <rect x="6" y="0" width="2" height="10" fill="black"/>
+                <rect x="10" y="0" width="4" height="10" fill="black"/>
+                
+                <!-- Data bars -->
+                <rect x="18" y="0" width="2" height="10" fill="black"/>
+                <rect x="22" y="0" width="1" height="10" fill="black"/>
+                <rect x="25" y="0" width="3" height="10" fill="black"/>
+                <rect x="30" y="0" width="2" height="10" fill="black"/>
+                <rect x="34" y="0" width="1" height="10" fill="black"/>
+                <rect x="37" y="0" width="3" height="10" fill="black"/>
+                <rect x="42" y="0" width="2" height="10" fill="black"/>
+                <rect x="46" y="0" width="1" height="10" fill="black"/>
+                <rect x="49" y="0" width="3" height="10" fill="black"/>
+                <rect x="54" y="0" width="2" height="10" fill="black"/>
+                <rect x="58" y="0" width="1" height="10" fill="black"/>
+                <rect x="61" y="0" width="3" height="10" fill="black"/>
+                <rect x="66" y="0" width="2" height="10" fill="black"/>
+                <rect x="70" y="0" width="1" height="10" fill="black"/>
+                <rect x="73" y="0" width="3" height="10" fill="black"/>
+                <rect x="78" y="0" width="2" height="10" fill="black"/>
+                <rect x="82" y="0" width="1" height="10" fill="black"/>
+                <rect x="85" y="0" width="3" height="10" fill="black"/>
+                <rect x="90" y="0" width="2" height="10" fill="black"/>
+                <rect x="94" y="0" width="1" height="10" fill="black"/>
+                <rect x="97" y="0" width="3" height="10" fill="black"/>
+                
+                <!-- End pattern -->
+                <rect x="104" y="0" width="4" height="10" fill="black"/>
+                <rect x="110" y="0" width="2" height="10" fill="black"/>
+                <rect x="114" y="0" width="4" height="10" fill="black"/>
+              </g>
+            </g>
+          </svg>
+        </div>
+        <div class="barcode-number">MEX123456789</div>
+      </div>
+
+      <!-- Branch Code Vertical -->
+      <div class="branch-code-vertical">B001</div>
+
+      <!-- Tracking Code Section -->
+      <div class="tracking-code-section">
+        <div class="tracking-code-label">หมายเลขพัสดุ</div>
+        <div class="tracking-code-value">MEX123456789</div>
+      </div>
+
+      <!-- Receiver Info -->
+      <div class="info-section">
+        <div><span class="info-label">ผู้รับ:</span> <span class="info-value">นาย ทดสอบ ระบบ</span> | <span class="info-label">โทร:</span> <span class="info-value">081-234-5678</span></div>
+        <div><span class="info-label">ปลายทาง:</span> <span class="info-value">123/45 หมู่บ้านทดสอบ ตำบลทดสอบ อำเภอมีนบุรี จังหวัดกรุงเทพฯ 10510</span></div>
+      </div>
+
+      <!-- Sender Info -->
+      <div class="info-section">
+        <div><span class="info-label">ผู้ส่ง:</span> <span class="info-value">บริษัท ทดสอบ จำกัด</span> | <span class="info-label">โทร:</span> <span class="info-value">02-123-4567</span></div>
+        <div><span class="info-label">ต้นทาง:</span> <span class="info-value">789/12 อาคารทดสอบ ถนนทดสอบ แขวงลาดกระบัง เขตลาดกระบัง กรุงเทพฯ 10520</span></div>
+      </div>
+
+      <!-- Parcel Details -->
+      <div class="info-section" style="background: #f9f9f9;">
+        <div class="info-label">พัสดุจ่ายต้นทาง</div>
+        <div>L: 30 cm | W: 20 cm | H: 10 cm</div>
+        <div>น้ำหนัก: 2.5 Kg</div>
+        <div><span class="info-label">ค่าจัดส่ง:</span> <span class="info-value">125 บาท</span></div>
+      </div>
+
+      <!-- Footer -->
+      <div class="info-section" style="background: #f8f9fa; text-align: center; font-size: 9px;">
+        ออกโดย: พนักงานทดสอบ<br>
+        เวลาทำการ จันทร์-ศุกร์ 08.00-18.00 น.<br>
+        ติดต่อ: +66 65 338 8543<br>
+        สร้างเมื่อ: 15/01/2567 14:30
+      </div>
+
+    </div>
+
+    <div class="explanation">
+      <h3>🎯 ผลลัพธ์ที่ได้:</h3>
+      <div class="feature-list">
+        <ul>
+          <li>� <strong>ตำแหน่งตรงกลาง:</strong> บาร์โค้ดอยู่ตรงกลางแนวตั้งของใบประหน้า</li>
+          <li>🔢 <strong>หมายเลขกำกับ:</strong> แสดงหมายเลขพัสดุใต้บาร์โค้ดในแนวตั้ง</li>
+          <li>📏 <strong>ขนาดเหมาะสม:</strong> บาร์โค้ด 180px สูง ไม่ใหญ่หรือเล็กเกินไป</li>
+          <li>📍 <strong>ตำแหน่งขวาสุด:</strong> ติดขอบขวาของใบประหน้าพอดี</li>
+          <li>🔄 <strong>หมุนในแนวตั้ง:</strong> สามารถอ่านและสแกนได้ง่าย</li>
+          <li>🖼️ <strong>ไม่รบกวนเนื้อหา:</strong> ข้อมูลอื่นๆ จัดเรียงอย่างเป็นระเบียบ</li>
+          <li>🖨️ <strong>เหมาะสำหรับพิมพ์:</strong> ขนาดและตำแหน่งที่เหมาะสำหรับการพิมพ์และสแกน</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

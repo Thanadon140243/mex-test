@@ -1,94 +1,78 @@
 import React, { useState, useEffect } from 'react';
 import { FaArrowRight } from 'react-icons/fa';
+import { printReceipt } from '../../utils/printUtils';
+import type { PaymentData } from '../../templates/receiptTemplate';
+import { printCoverSheet, CoverSheetParcelData } from '../../utils/printCoverSheetUtils';
+import axios from 'axios';
 
-const MIXAY_URL = import.meta.env.VITE_MIXAY_URL;
-const MIXAY_USERNAME = import.meta.env.VITE_MIXAY_USERNAME;
-const MIXAY_PASSWORD = import.meta.env.VITE_MIXAY_PASSWORD;
-const MIXAY_PARTNER_CODE = import.meta.env.VITE_MIXAY_PARTNER_CODE;
+// 📁 Import Constants
+import { 
+  API_CONFIG, 
+  employeeData, 
+  TRANSPORTERS, 
+  priceTable 
+} from './constants';
+import { formatNumberWithCommas } from './utils/formatNumber';
 
-const HAL_API_URL = import.meta.env.VITE_HAL_API_URL;
-const HAL_API_CLIENT_ID = import.meta.env.VITE_HAL_API_CLIENT_ID;
-const HAL_API_CLIENT_SECRET = import.meta.env.VITE_HAL_API_CLIENT_SECRET;
-const HAL_API_GRANT_TYPE = import.meta.env.VITE_HAL_API_GRANT_TYPE;
-const HAL_API_SCOPE = import.meta.env.VITE_HAL_API_SCOPE;
-const HAL_API_USERNAME = import.meta.env.VITE_HAL_API_USERNAME;
-const HAL_API_PASSWORD = import.meta.env.VITE_HAL_API_PASSWORD;
-  
-  // ข้อมูลนตาราง
-  const mockData = [
-    {
-      parcelNumber: '123456',
-      senderReceiver: 'นาย ก./นาย ข.',
-      deliveryType: 'ด่วน',
-      friendlyPrice: 100.0,
-      externalPriceTHB: 200.0,
-      externalPriceLAK: 500.0,
-      totalPriceTHB: 300.0,
-      totalPriceLAK: 700.0,
-    },
-  ];
-  
-  // ข้อมูลพนักงาน
-  const employeeData = {
-    name: 'นาย สมชาย ใจดี',
-    positionGroup: 'ผู้จัดการฝ่ายขนส่ง',
-    credit : '5000.00',
-  };
+// 📁 Import Services & Hooks
+import { 
+  bookThaiParcel as bookThaiParcelService, 
+  getCourierCode 
+} from './shipping/services';
+import { usePostalData } from './shipping/hooks';
+import type { ZipDataItem } from './shipping/types';
 
-  // ข้อมูลขนส่งไทย
-  const thaiTransporters = [
-    { name: 'ไปรษณีย์ไทย', image: '/img/logoShipping/Thaipost.jpg', isActive: false },
-    { name: 'SCG Express', image: '/img/logoShipping/scg.png', isActive: false },
-    { name: 'DHL', image: '/img/logoShipping/dhl.png', isActive: false },
-    { name: 'Ninjavan', image: '/img/logoShipping/ninjavan.png', isActive: false },
-    { name: 'Flash Express', image: '/img/logoShipping/flash.jpeg', isActive: true },
-    { name: 'Best Express', image: '/img/logoShipping/best.png', isActive: true },
-    { name: 'Aramex', image: '/img/logoShipping/aramex.png', isActive: false },
-    { name: 'Kerry Express', image: '/img/logoShipping/kerry.png', isActive: false },
-    { name: 'Lazada', image: '/img/logoShipping/lazada.png', isActive: false },
-    { name: 'Makesend', image: '/img/logoShipping/makesend.png', isActive: false },
-    { name: 'SPX Xpress', image: '/img/logoShipping/shopee.jpg', isActive: false },
-    { name: 'Lalamove', image: '/img/logoShipping/lalamove.png', isActive: false },
-    { name: 'Skootar', image: '/img/logoShipping/skootar.png', isActive: false },
-  ];
+// เอา API URLs จากไฟล์ constants แทน
+const MIXAY_URL = API_CONFIG.MIXAY.URL;
+const MIXAY_USERNAME = API_CONFIG.MIXAY.USERNAME;
+const MIXAY_PASSWORD = API_CONFIG.MIXAY.PASSWORD;
+const MIXAY_PARTNER_CODE = API_CONFIG.MIXAY.PARTNER_CODE;
 
-  // ข้อมูลขนส่งลาว
-  const laoTransporters = [
-    { name: 'Mixay', image: '/img/logoShipping/Mixay_logo.png', isActive: true },
-    { name: 'HAL', image: '/img/logoShipping/HAL_logo.png', isActive: true },
-  ];
+const HAL_API_CLIENT_ID = API_CONFIG.HAL.CLIENT_ID;
+const HAL_API_CLIENT_SECRET = API_CONFIG.HAL.CLIENT_SECRET;
+const HAL_API_GRANT_TYPE = API_CONFIG.HAL.GRANT_TYPE;
+const HAL_API_SCOPE = API_CONFIG.HAL.SCOPE;
+const HAL_API_USERNAME = API_CONFIG.HAL.USERNAME;
+const HAL_API_PASSWORD = API_CONFIG.HAL.PASSWORD;
 
+// เอาข้อมูล transporters จากไฟล์ constants แทน  
+const thaiTransporters = TRANSPORTERS.THAI;
+const thaiLaosTransporters = TRANSPORTERS.THAI_LAOS;
+const laoTransporters = TRANSPORTERS.LAO;
 
-  // ฟังก์ชันสำหรับใส่เครื่องหมายจุลภาคในตัวเลข
-const formatNumberWithCommas = (number: number): string => {
-  return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-};
+// ฟังก์ชันสำหรับใส่เครื่องหมายจุลภาคในตัวเลข - ใช้จากไฟล์ utils แทน
 
 const ShippingAdd: React.FC = () => {
 
     const [countryCode, setCountryCode] = useState<string | null>(null); // สร้าง state สำหรับ countryCode
-    const [parcelData, setParcelData] = useState(mockData); // สร้าง state สำหรับข้อมูลพัสดุ
+    interface ParcelTableData {
+      parcelNumber: string;
+      senderReceiver: string;
+      deliveryType: string;
+      mitaparpPrice: number;
+      mitaparpPriceTHB: number;
+      externalPriceTHB: number;
+      externalPriceLAK: number;
+      totalPriceTHB: number;
+      totalPriceLAK: number;
+      // 🔥 เพิ่มฟิลด์ใหม่
+      senderName?: string;
+      senderAddress?: string;
+      receiverName?: string;
+      receiverAddress?: string;
+      weight?: number;
+      width?: number;
+      length?: number;
+      height?: number;
+      senderPhone?: string;
+      receiverPhone?: string;
+    }
+    
+    const [parcelData, setParcelData] = useState<ParcelTableData[]>([]); // สร้าง state สำหรับข้อมูลพัสดุ
     const [selectedMenu, setSelectedMenu] = useState<string>('parcel'); // ตั้งค่าเริ่มต้นเป็น 'parcel'
 
-    interface ZipDataItem {
-      ตำบล: string;
-      อำเภอ: string;
-      จังหวัด: string;
-    }
-    
-    // Define the ZipData type
-    interface ZipData {
-      [zipcode: string]: ZipDataItem[];
-    }
-    
-        const [zipData, setZipData] = useState<ZipData>({}); // เก็บข้อมูลรหัสไปรษณีย์
-
-    // ดึงข้อมูลรหัสไปรษณีย์จากไฟล์ JSON
-    useEffect(() => {
-      fetch('/json/postal_address_data.json')
-        .then((res) => res.json())
-        .then((data) => setZipData(data));
-    }, []);
+    // 🔄 ใช้ Hook สำหรับจัดการข้อมูลรหัสไปรษณีย์
+    const { searchZipCode, findZipCodeByItem } = usePostalData();
 
     const [senderAddressArea, setSenderZipcode] = useState(''); // สร้าง state สำหรับรหัสไปรษณีย์ผู้ส่ง
     const [senderResult, setSenderResult] = useState<ZipDataItem[]>([]); // สร้าง state สำหรับผลลัพธ์การค้นหารหัสไปรษณีย์ผู้ส่ง
@@ -97,7 +81,28 @@ const ShippingAdd: React.FC = () => {
     const [senderZipcodeThaiLaos, setSenderZipcodeThaiLaos] = useState(''); // รหัสไปรษณีย์ผู้ส่ง
     const [senderResultThaiLaos, setSenderResultThaiLaos] = useState<ZipDataItem[]>([]); // ผลลัพธ์การค้นหาผู้ส่ง
 
+    const [showPrintPopup, setShowPrintPopup] = useState(false);
 
+    const [showPaymentPopup, setShowPaymentPopup] = useState(false);
+    const [receivedAmount, setReceivedAmount] = useState('');
+
+    const [paymentCurrency, setPaymentCurrency] = useState<'THB' | 'LAK'>('THB');
+
+    const totalTHB = parcelData.reduce((sum, item) => {
+      const external = parseFloat(item.externalPriceTHB?.toString() || "0");
+      const mitaparp = parseFloat(item.mitaparpPriceTHB?.toString() || "0");
+      return sum + external + mitaparp;
+    }, 0);
+
+    const totalLAK = parcelData.reduce((sum, item) => {
+      const mitaparp = parseFloat(item.mitaparpPrice?.toString() || "0");
+      const external = parseFloat(item.externalPriceLAK?.toString() || "0");
+      return sum + mitaparp + external;
+    }, 0);
+    const totalAmount = paymentCurrency === 'THB' ? totalTHB : totalLAK;
+    const changeAmount = receivedAmount 
+      ? Math.round((parseFloat(receivedAmount) - totalAmount) * 100) / 100 
+      : 0;
 
     //-----------------------------------------------------------------------//
 
@@ -117,17 +122,122 @@ const ShippingAdd: React.FC = () => {
       parcelNumber: null,
     });
     
+    interface MixayParcelResponse {
+      parcel?: {
+        external_tracking_no?: string;
+        sender_name?: string;
+        receiver_name?: string;
+        price?: number;
+        [key: string]: unknown;
+      };
+      [key: string]: unknown;
+    }
+
+    const mapMixayResponseToTable = (
+      response: MixayParcelResponse, 
+      transporterName: string,
+      formData?: {
+        senderPhone?: string;
+        receiverPhone?: string;
+        senderName?: string;
+        receiverName?: string;
+        senderAddress?: string;
+        receiverAddress?: string;
+        weight?: number;
+        width?: number;
+        length?: number;
+        height?: number;
+      } // เพิ่มพารามิเตอร์สำหรับข้อมูลฟอร์ม
+    ) => {
+      // 🔍 Debug ข้อมูลที่รับเข้ามาใน mapMixayResponseToTable
+      console.log("🔍 DEBUG mapMixayResponseToTable รับค่า:");
+      console.log("- response:", response);
+      console.log("- transporterName:", transporterName);
+      console.log("- formData:", formData);
+      console.log("- formData.senderPhone:", formData?.senderPhone);
+      console.log("- formData.receiverPhone:", formData?.receiverPhone);
+
+      const result = {
+        parcelNumber: response.parcel?.external_tracking_no || "-",
+        senderReceiver: `
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="background:rgba(59,130,246,0.08);border-radius:10px;padding:4px 10px 4px 10px;display:flex;align-items:center;">
+              <span style="font-weight:600;color:#2563eb;">ผู้ส่ง</span>
+              <span style="color:#222;margin-left:8px;">${response.parcel?.sender_name || "-"}</span>
+            </div>
+            <div style="background:rgba(16,185,129,0.08);border-radius:10px;padding:4px 10px 4px 10px;display:flex;align-items:center;">
+              <span style="font-weight:600;color:#059669;">ผู้รับ</span>
+              <span style="color:#222;margin-left:8px;">${response.parcel?.receiver_name || "-"}</span>
+            </div>
+          </div>
+        `,
+        deliveryType: transporterName,
+        mitaparpPrice: 10000,
+        mitaparpPriceTHB: 200,
+        externalPriceTHB: 150,
+        externalPriceLAK: typeof response.parcel?.price === "number" ? response.parcel.price : 0,
+        totalPriceTHB: 0,
+        totalPriceLAK: 0,
+        // ✅ ใช้ข้อมูลจากฟอร์มแทนค่าว่าง
+        senderPhone: formData?.senderPhone || '',
+        receiverPhone: formData?.receiverPhone || '',
+        // เพิ่มข้อมูลอื่นๆ ที่จำเป็นสำหรับใบประหน้า
+        senderName: formData?.senderName || response.parcel?.sender_name || '',
+        receiverName: formData?.receiverName || response.parcel?.receiver_name || '',
+        senderAddress: formData?.senderAddress || '',
+        receiverAddress: formData?.receiverAddress || '',
+        weight: formData?.weight || 0,
+        width: formData?.width || 0,
+        length: formData?.length || 0,
+        height: formData?.height || 0,
+      };
+
+      // 🔍 Debug ผลลัพธ์ที่จะ return
+      console.log("🔍 DEBUG mapMixayResponseToTable จะ return:", result);
+      console.log("🔍 DEBUG เบอร์โทรใน result:", {
+        senderPhone: result.senderPhone,
+        receiverPhone: result.receiverPhone
+      });
+
+      return result;
+    };
+
+    const calculateShippingPrice = () => {
+      const weight = parseFloat(formDataThaiLaos.weightThaiLaos);
+      const width = parseFloat(formDataThaiLaos.widthThaiLaos);
+      const length = parseFloat(formDataThaiLaos.lengthThaiLaos);
+      const height = parseFloat(formDataThaiLaos.heightThaiLaos);
+      
+      // ตรวจสอบว่าข้อมูลครบถ้วนหรือไม่
+      if (isNaN(weight) || isNaN(width) || isNaN(length) || isNaN(height)) {
+        return 0;
+      }
+      
+      // คำนวณขนาดรวม (กว้าง x ยาว x สูง)
+      const totalSize = width * length * height;
+      
+      // หาราคาที่เหมาะสมจากตาราง
+      for (const item of priceTable) {
+        if (totalSize <= item.maxSize && weight <= item.maxWeight) {
+          return item.price;
+        }
+      }
+      
+      // ถ้าเกินขนาดสูงสุด ให้ใช้ราคาสูงสุด
+      return 620;
+    };
+
+    const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
+
+
     //------------------------------ ฟังก์ชันสำหรับค้นหารหัสไปรษณีย์ ------------------------------//
 
     const handleSenderZipcodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const inputValue = e.target.value;
       setSenderZipcode(inputValue);
     
-      if (inputValue in zipData) {
-        setSenderResult(zipData[inputValue]);
-      } else {
-        setSenderResult([]);
-      }
+      const searchResults = searchZipCode(inputValue);
+      setSenderResult(searchResults);
     
       // ลบข้อความข้อผิดพลาดเมื่อกรอกข้อมูล
       if (errorsThai.senderAddressArea) {
@@ -137,7 +247,7 @@ const ShippingAdd: React.FC = () => {
     
     // ฟังก์ชันสำหรับจัดการการเลือกพื้นที่บริการ (ผู้ส่ง)
     const handleSenderResultSelect = (selectedItem: ZipDataItem) => {
-      const selectedZipcode = Object.keys(zipData).find((key) => zipData[key].includes(selectedItem));
+      const selectedZipcode = findZipCodeByItem(selectedItem);
       const selectedArea = `${selectedZipcode} ${selectedItem.ตำบล} ${selectedItem.อำเภอ} ${selectedItem.จังหวัด}`;
       setSenderZipcode(selectedArea);
       setFormDataThai({ ...formDataThai, senderAddressAreaThai: selectedArea });
@@ -149,11 +259,8 @@ const ShippingAdd: React.FC = () => {
       const inputValue = e.target.value;
       setReceiverZipcode(inputValue);
     
-      if (inputValue in zipData) {
-        setReceiverResult(zipData[inputValue]);
-      } else {
-        setReceiverResult([]);
-      }
+      const searchResults = searchZipCode(inputValue);
+      setReceiverResult(searchResults);
     
       // ลบข้อความข้อผิดพลาดเมื่อกรอกข้อมูล
       if (errorsThai.receiverAddressArea) {
@@ -163,7 +270,7 @@ const ShippingAdd: React.FC = () => {
     
     // ฟังก์ชันสำหรับจัดการการเลือกพื้นที่บริการ (ผู้รับ)
     const handleReceiverResultSelect = (selectedItem: ZipDataItem) => {
-      const selectedZipcode = Object.keys(zipData).find((key) => zipData[key].includes(selectedItem));
+      const selectedZipcode = findZipCodeByItem(selectedItem);
       const selectedArea = `${selectedZipcode} ${selectedItem.ตำบล} ${selectedItem.อำเภอ} ${selectedItem.จังหวัด}`;
       setReceiverZipcode(selectedArea);
       setFormDataThai({ ...formDataThai, receiverAddressAreaThai: selectedArea });
@@ -175,11 +282,8 @@ const ShippingAdd: React.FC = () => {
       const inputValue = e.target.value;
       setSenderZipcodeThaiLaos(inputValue);
 
-      if (inputValue in zipData) {
-        setSenderResultThaiLaos(zipData[inputValue]);
-      } else {
-        setSenderResultThaiLaos([]);
-      }
+      const searchResults = searchZipCode(inputValue);
+      setSenderResultThaiLaos(searchResults);
 
       // ลบข้อความข้อผิดพลาดเมื่อกรอกข้อมูล
       if (errorsThaiLaos.senderAddressAreaThaiLaos) {
@@ -189,7 +293,7 @@ const ShippingAdd: React.FC = () => {
 
     // ฟังก์ชันสำหรับจัดการการเลือกพื้นที่บริการ (ผู้ส่ง)
     const handleSenderResultSelectThaiLaos = (selectedItem: ZipDataItem) => {
-      const selectedZipcode = Object.keys(zipData).find((key) => zipData[key].includes(selectedItem));
+      const selectedZipcode = findZipCodeByItem(selectedItem);
       const selectedArea = `${selectedZipcode} ${selectedItem.ตำบล} ${selectedItem.อำเภอ} ${selectedItem.จังหวัด}`;
       setSenderZipcodeThaiLaos(selectedArea);
       setFormDataThaiLaos({ ...formDataThaiLaos, senderAddressAreaThaiLaos: selectedArea });
@@ -205,7 +309,25 @@ const ShippingAdd: React.FC = () => {
         const [selectedLaoTransporter, setSelectedLaoTransporter] = useState<string | null>(null); // เก็บขนส่งลาวที่เลือก
 
         const handleSelectLaoTransporter = (transporterName: string) => {
+          console.log("🔍 เลือกขนส่งลาว:", transporterName);
           setSelectedLaoTransporter(transporterName); // บันทึกชื่อขนส่งที่เลือก
+          
+          // เชื่อม API เมื่อเลือก Mixay
+          if (transporterName === "Mixay") {
+            console.log("🔗 เริ่มเชื่อม API Mixay...");
+            console.log("📊 ตรวจสอบค่า Environment Variables:");
+            console.log("- MIXAY_URL:", MIXAY_URL);
+            console.log("- MIXAY_USERNAME:", MIXAY_USERNAME);
+            console.log("- MIXAY_PASSWORD:", MIXAY_PASSWORD ? "มีค่า" : "ไม่มีค่า");
+            console.log("- MIXAY_PARTNER_CODE:", MIXAY_PARTNER_CODE);
+            
+            fetchMixayToken().then(() => {
+              console.log("✅ Login Mixay สำเร็จ, เริ่มดึงข้อมูล Dropship...");
+              fetchMixayDropshipData(); // เรียก API ดึงข้อมูล Dropship หลังจาก login สำเร็จ
+            }).catch((error) => {
+              console.error("❌ Login Mixay ล้มเหลว:", error);
+            });
+          }
         };
 
         const [popupLaos, setPopupLaos] = useState(false); // สร้าง state สำหรับ Popup ขนส่งลาว
@@ -247,6 +369,23 @@ const ShippingAdd: React.FC = () => {
 
     //------------------------------ Popup ไทย ------------------------------//
 
+    // 📦 จองพัสดุผ่าน SHIPPOP API (ใช้ service)
+    const bookThaiParcel = async (courierCode: string) => {
+      try {
+        const newParcelData = await bookThaiParcelService(formDataThai, courierCode, selectedTransporter || "Flash Express");
+        
+        if (newParcelData) {
+          setParcelData(prev => [...prev, newParcelData]);
+          console.log("✅ เพิ่มข้อมูลลงตารางสำเร็จ");
+          closePopupThai();
+        } else {
+          console.log("⚠️ SHIPPOP booking: ไม่พบข้อมูลพัสดุใน response");
+        }
+      } catch (error) {
+        console.error("❌ SHIPPOP booking error:", error);
+      }
+    };
+
     const [errorsThai, setErrorsThai] = useState<{ [key: string]: string }>({});
 
     const [formDataThai, setFormDataThai] = useState({
@@ -263,6 +402,7 @@ const ShippingAdd: React.FC = () => {
       productTypeThai: '',
       senderAddressAreaThai: '',
       receiverAddressAreaThai: '',
+      calculatedPrice: '', // เพิ่มฟิลด์สำหรับเก็บราคาที่คำนวนได้
     });
 
     // ฟังก์ชันเปิด Popup สำหรับขนส่ง
@@ -402,6 +542,7 @@ const ShippingAdd: React.FC = () => {
     //------------------------------ Popup ไทย-ลาว ------------------------------//
 
     const [errorsThaiLaos, setErrorsThaiLaos] = useState<{ [key: string]: string }>({});
+    const [mixayCalculatedPriceThaiLaos, setMixayCalculatedPriceThaiLaos] = useState<number | null>(null);
 
     const [formDataThaiLaos, setFormDataThaiLaos] = useState({
       senderNameThaiLaos: '',
@@ -413,6 +554,7 @@ const ShippingAdd: React.FC = () => {
       receiverVillagesThaiLaos: '',
       receiverDistricThaiLaos: '',
       receiverProvincestThaiLaos: '',
+      receiverBranchThaiLaos: '',
       weightThaiLaos: '',
       widthThaiLaos: '',
       lengthThaiLaos: '',
@@ -523,7 +665,7 @@ const ShippingAdd: React.FC = () => {
         isValid = false;
       }
       if (!formDataThaiLaos.receiverVillagesThaiLaos) {
-        newErrors.receiverVillagesThaiLaos = "กรุณากรอกบ้านผ";
+        newErrors.receiverVillagesThaiLaos = "กรุณากรอกบ้าน";
         isValid = false;
       }
       if (!formDataThaiLaos.receiverDistricThaiLaos) {
@@ -532,6 +674,10 @@ const ShippingAdd: React.FC = () => {
       }
       if (!formDataThaiLaos.receiverProvincestThaiLaos) {
         newErrors.receiverProvincestThaiLaos = "กรุณากรอกแขวง";
+        isValid = false;
+      }
+      if (!formDataThaiLaos.receiverBranchThaiLaos) {
+        newErrors.receiverBranchThaiLaos = "กรุณากรอกสาขา";
         isValid = false;
       }
     
@@ -572,6 +718,7 @@ const ShippingAdd: React.FC = () => {
         receiverVillagesThaiLaos: '',
         receiverDistricThaiLaos: '',
         receiverProvincestThaiLaos: '',
+        receiverBranchThaiLaos: '',
         weightThaiLaos: '',
         widthThaiLaos: '',
         lengthThaiLaos: '',
@@ -583,7 +730,334 @@ const ShippingAdd: React.FC = () => {
       setSenderResultThaiLaos([]); // ล้างผลลัพธ์การค้นหาผู้ส่ง
       setThaiLaosStep(1); // รีเซ็ตขั้นตอนกลับไปที่ Step 1
       setSelectedLaoTransporter(null); // ล้างค่าขนส่งลาวที่เลือก
+      setMixayCalculatedPriceThaiLaos(null); // รีเซ็ตราคาที่คำนวณ
+      
+      // 🟢 Reset search states สำหรับ ThaiLaos
+      setReceiverProvinceSearchTermThaiLaos('');
+      setReceiverDistrictSearchTermThaiLaos('');
+      setReceiverVillagesSearchTermThaiLaos('');
+      setReceiverBranchSearchTermThaiLaos('');
+      
+      // Reset selected IDs
+      setReceiverSelectedProvinceIdThaiLaos(null);
+      setReceiverSelectedDistrictIdThaiLaos(null);
+      setSelectedReceiverVillageIdThaiLaos(null);
+      
+      // Reset dropdown states
+      setReceiverProvinceDropdownOpenThaiLaos(false);
+      setReceiverDistrictDropdownOpenThaiLaos(false);
+      setReceiverVillagesDropdownOpenThaiLaos(false);
+      setReceiverBranchDropdownOpenThaiLaos(false);
     };
+
+    // 🟢 Function สำหรับจัดการ input changes ของ แขวง เมือง บ้าน สาขา สำหรับ ThaiLaos
+    const handleThaiLaosLocationInputChange = (
+      e: React.ChangeEvent<HTMLInputElement>,
+      fieldName: string,
+      resetLowerLevels: boolean = false
+    ) => {
+      const { value } = e.target;
+      
+      // อัปเดตค่าใน formDataThaiLaos
+      setFormDataThaiLaos((prevFormData) => ({
+        ...prevFormData,
+        [fieldName]: value,
+      }));
+      
+      // ลบข้อความแจ้งเตือนของฟิลด์ที่กำลังกรอก
+      if (errorsThaiLaos[fieldName]) {
+        setErrorsThaiLaos((prevErrors) => ({
+          ...prevErrors,
+          [fieldName]: '',
+        }));
+      }
+      
+      // Reset lower level fields when upper level changes
+      if (resetLowerLevels) {
+        if (fieldName === 'receiverProvincestThaiLaos') {
+          // Reset เมือง บ้าน สาขา เมื่อเปลี่ยนแขวง
+          setFormDataThaiLaos((prev) => ({
+            ...prev,
+            receiverDistricThaiLaos: '',
+            receiverVillagesThaiLaos: '',
+            receiverBranchThaiLaos: '',
+          }));
+          setReceiverDistrictSearchTermThaiLaos('');
+          setReceiverVillagesSearchTermThaiLaos('');
+          setReceiverBranchSearchTermThaiLaos('');
+          setReceiverSelectedDistrictIdThaiLaos(null);
+          setSelectedReceiverVillageIdThaiLaos(null);
+        } else if (fieldName === 'receiverDistricThaiLaos') {
+          // Reset บ้าน สาขา เมื่อเปลี่ยนเมือง
+          setFormDataThaiLaos((prev) => ({
+            ...prev,
+            receiverVillagesThaiLaos: '',
+            receiverBranchThaiLaos: '',
+          }));
+          setReceiverVillagesSearchTermThaiLaos('');
+          setReceiverBranchSearchTermThaiLaos('');
+          setSelectedReceiverVillageIdThaiLaos(null);
+        } else if (fieldName === 'receiverVillagesThaiLaos') {
+          // Reset สาขา เมื่อเปลี่ยนบ้าน
+          setFormDataThaiLaos((prev) => ({
+            ...prev,
+            receiverBranchThaiLaos: '',
+          }));
+          setReceiverBranchSearchTermThaiLaos('');
+        }
+      }
+    };
+
+    const addMixayParcelThaiLaos = async () => {
+      console.log("📦 เริ่มสร้างพัสดุ Mixay ไทย-ลาว");
+      
+      if (mixayCalculatedPriceThaiLaos === null) {
+        await calculateMixayPriceThaiLaos();
+        if (mixayCalculatedPriceThaiLaos === null) {
+          alert("ไม่สามารถคำนวณราคาได้ กรุณาลองใหม่อีกครั้ง");
+          return;
+        }
+      }
+
+      // 🔥 คำนวณค่าต่างๆ ที่จะใส่ลงตาราง
+      const crossingFeeInBaht = calculateShippingPrice();
+      const crossingFeeInKip = Math.round(crossingFeeInBaht * 650 * 1.02);
+      
+      let shippingFeeInBaht = 0;
+      let shippingFeeInKip = 0;
+      let totalBaht = 0;
+      let totalKip = 0;
+      
+      if (selectedLaoTransporter === "Mixay" && mixayCalculatedPriceThaiLaos !== null) {
+        const adjustedRate = 650 * 0.98; // 637
+        shippingFeeInBaht = parseFloat((mixayCalculatedPriceThaiLaos / adjustedRate).toFixed(2));
+        shippingFeeInKip = mixayCalculatedPriceThaiLaos;
+        totalBaht = parseFloat((shippingFeeInBaht + crossingFeeInBaht).toFixed(2));
+        totalKip = Math.round(shippingFeeInKip + crossingFeeInKip);
+      } else {
+        shippingFeeInBaht = 0;
+        shippingFeeInKip = 0;
+        totalBaht = shippingFeeInBaht + crossingFeeInBaht;
+        totalKip = Math.round(crossingFeeInKip);
+      }
+
+      const payload = {
+        partner_code: MIXAY_PARTNER_CODE,
+        weight: Number(formDataThaiLaos.weightThaiLaos),
+        destination_type: "non_capital",
+        source_system_reference: `order-${Date.now()}`,
+        parcel_name: formDataThaiLaos.productTypeThaiLaos,
+        sender_name: formDataThaiLaos.senderNameThaiLaos,
+        sender_phone: formDataThaiLaos.senderPhoneThaiLaos,
+        sender_address: `${formDataThaiLaos.senderAddressThaiLaos || ''} ${formDataThaiLaos.senderAddressAreaThaiLaos || ''}`.trim(),
+        receiver_name: formDataThaiLaos.receiverNameThaiLaos,
+        receiver_phone: formDataThaiLaos.receiverPhoneThaiLaos,
+        receiver_address: [
+          formDataThaiLaos.receiverAddressThaiLaos,
+          formDataThaiLaos.receiverVillagesThaiLaos,
+          formDataThaiLaos.receiverDistricThaiLaos,
+          formDataThaiLaos.receiverProvincestThaiLaos
+        ].filter(Boolean).join(" "),
+        dropship_end: 1,
+        size_w: Number(formDataThaiLaos.widthThaiLaos),
+        size_l: Number(formDataThaiLaos.lengthThaiLaos),
+        size_h: Number(formDataThaiLaos.heightThaiLaos),
+        cod_price: 0,
+        price: mixayCalculatedPriceThaiLaos
+      };
+
+      try {
+        const token = localStorage.getItem("mixay_token");
+        const response = await axios.post(
+          `${MIXAY_URL}/api/v1/ex_parcel/add_ex_parcel/add`,
+          payload,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        
+        const data = response.data;
+
+        // เพิ่ม debug ก่อนสร้าง newParcelData
+        console.log("🔍 DEBUG formDataThaiLaos:", {
+          senderName: formDataThaiLaos.senderNameThaiLaos,
+          senderAddress: formDataThaiLaos.senderAddressAreaThaiLaos,
+          receiverName: formDataThaiLaos.receiverNameThaiLaos,
+          receiverVillages: formDataThaiLaos.receiverVillagesThaiLaos,
+          receiverDistric: formDataThaiLaos.receiverDistricThaiLaos,
+          receiverProvinces: formDataThaiLaos.receiverProvincestThaiLaos
+        });
+
+        // 🔥 เพิ่มข้อมูลลงตารางพร้อมค่าที่คำนวณได้
+        if (data.status && data.parcel) {
+          const transporterDisplay = `${selectedTransporter} → ${selectedLaoTransporter}`;
+          
+          const newParcelData = {
+            parcelNumber: data.parcel?.external_tracking_no || "-",
+            senderReceiver: `
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <div style="background:rgba(59,130,246,0.08);border-radius:10px;padding:4px 10px 4px 10px;display:flex;align-items:center;">
+                  <span style="font-weight:600;color:#2563eb;">ผู้ส่ง</span>
+                  <span style="color:#222;margin-left:8px;">${formDataThaiLaos.senderNameThaiLaos || "-"}</span>
+                </div>
+                <div style="background:rgba(16,185,129,0.08);border-radius:10px;padding:4px 10px 4px 10px;display:flex;align-items:center;">
+                  <span style="font-weight:600;color:#059669;">ผู้รับ</span>
+                  <span style="color:#222;margin-left:8px;">${formDataThaiLaos.receiverNameThaiLaos || "-"}</span>
+                </div>
+              </div>
+            `,
+            deliveryType: transporterDisplay,
+            mitaparpPrice: crossingFeeInKip,
+            mitaparpPriceTHB: crossingFeeInBaht,
+            externalPriceTHB: shippingFeeInBaht,
+            externalPriceLAK: shippingFeeInKip,
+            totalPriceTHB: totalBaht,
+            totalPriceLAK: totalKip,
+            // 🔥 ข้อมูลผู้ส่ง-ผู้รับ
+            senderName: formDataThaiLaos.senderNameThaiLaos || '',
+            senderAddress: `${formDataThaiLaos.senderAddressThaiLaos || ''} ${formDataThaiLaos.senderAddressAreaThaiLaos || ''}`.trim(),
+            receiverName: formDataThaiLaos.receiverNameThaiLaos || '',
+            receiverAddress: [
+              formDataThaiLaos.receiverAddressThaiLaos || '',
+              formDataThaiLaos.receiverVillagesThaiLaos,
+              formDataThaiLaos.receiverDistricThaiLaos,
+              formDataThaiLaos.receiverProvincestThaiLaos
+            ].filter(Boolean).join(' ') || '',
+            // 🔥 เพิ่มข้อมูลน้ำหนักและขนาด
+            weight: parseFloat(formDataThaiLaos.weightThaiLaos) || 0,
+            width: parseFloat(formDataThaiLaos.widthThaiLaos) || 0,
+            length: parseFloat(formDataThaiLaos.lengthThaiLaos) || 0,
+            height: parseFloat(formDataThaiLaos.heightThaiLaos) || 0,
+            // ✅ เพิ่มเบอร์โทร (ส่วนที่ขาดหายไป!)
+            senderPhone: formDataThaiLaos.senderPhoneThaiLaos || '',
+            receiverPhone: formDataThaiLaos.receiverPhoneThaiLaos || '',
+          };
+
+          console.log("📦 ข้อมูลพัสดุที่จะเพิ่ม (รวมชื่อ-ที่อยู่):", newParcelData);
+          
+          setParcelData(prev => [...prev, newParcelData]);
+          console.log("✅ เพิ่มข้อมูลลงตารางสำเร็จ:", newParcelData);
+          
+          setMixayCalculatedPriceThaiLaos(null);
+        } else {
+          console.error("❌ สร้างพัสดุไม่สำเร็จ");
+        }
+      } catch (e) {
+        console.error("❌ Mixay ไทย-ลาว Add Parcel Error:", e);
+      }
+    };
+
+    const calculateMixayPriceThaiLaos = async () => {
+      console.log("🧮 เริ่มคำนวณราคา Mixay ไทย-ลาว");
+      console.log("📋 ข้อมูลสำหรับคำนวณ:", {
+        weight: formDataThaiLaos.weightThaiLaos,
+        productType: formDataThaiLaos.productTypeThaiLaos,
+        dimensions: {
+          width: formDataThaiLaos.widthThaiLaos,
+          length: formDataThaiLaos.lengthThaiLaos,
+          height: formDataThaiLaos.heightThaiLaos
+        }
+      });
+
+      if (!formDataThaiLaos.weightThaiLaos || !formDataThaiLaos.productTypeThaiLaos || !formDataThaiLaos.widthThaiLaos || !formDataThaiLaos.lengthThaiLaos || !formDataThaiLaos.heightThaiLaos) {
+        console.log("⚠️ ข้อมูลไม่ครบสำหรับการคำนวณ");
+        setMixayCalculatedPriceThaiLaos(null);
+        return;
+      }
+
+      const payload = {
+        partner_code: MIXAY_PARTNER_CODE,
+        weight: Number(formDataThaiLaos.weightThaiLaos),
+        destination_type: "non_capital",
+        source_system_reference: `calc-${Date.now()}`,
+        parcel_name: formDataThaiLaos.productTypeThaiLaos,
+        sender_name: formDataThaiLaos.senderNameThaiLaos || "Test Sender",
+        sender_phone: formDataThaiLaos.senderPhoneThaiLaos || "0123456789",
+        sender_address: `${formDataThaiLaos.senderAddressThaiLaos || 'Test Address'} ${formDataThaiLaos.senderAddressAreaThaiLaos || ''}`.trim(),
+        receiver_name: formDataThaiLaos.receiverNameThaiLaos || "Test Receiver",
+        receiver_phone: formDataThaiLaos.receiverPhoneThaiLaos || "0123456789",
+        receiver_address: [
+          formDataThaiLaos.receiverAddressThaiLaos || "Test Address",
+          formDataThaiLaos.receiverVillagesThaiLaos || "",
+          formDataThaiLaos.receiverDistricThaiLaos || "",
+          formDataThaiLaos.receiverProvincestThaiLaos || ""
+        ].filter(Boolean).join(" "),
+        dropship_end: 1,
+        size_w: Number(formDataThaiLaos.widthThaiLaos),
+        size_l: Number(formDataThaiLaos.lengthThaiLaos),
+        size_h: Number(formDataThaiLaos.heightThaiLaos),
+        cod_price: 100000
+      };
+
+      console.log("📤 Payload สำหรับคำนวณราคา:", payload);
+
+      try {
+        const token = localStorage.getItem("mixay_token");
+        console.log("🔑 ใช้ Token สำหรับคำนวณ:", token ? token.substring(0, 20) + "..." : "ไม่มี Token");
+        
+        if (!token) {
+          console.error("❌ ไม่พบ Token สำหรับการคำนวณ");
+          setMixayCalculatedPriceThaiLaos(null);
+          return;
+        }
+
+        const response = await axios.post(
+          `${MIXAY_URL}/api/v1/ex_parcel/add_ex_parcel/cal`,
+          payload,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        
+        console.log("📨 Calculate Response Status:", response.status);
+        console.log("📨 Calculate Response Data:", response.data);
+
+        const data = response.data;
+
+        if (data.data?.price !== undefined) {
+          setMixayCalculatedPriceThaiLaos(data.data.price);
+          console.log("✅ คำนวณราคาสำเร็จ:", data.data.price, "กีบ");
+        } else {
+          console.log("⚠️ ไม่พบราคาในการตอบกลับ");
+          setMixayCalculatedPriceThaiLaos(null);
+        }
+      } catch (e) {
+        console.error("❌ เกิดข้อผิดพลาดในการคำนวณราคา:", e);
+        setMixayCalculatedPriceThaiLaos(null);
+      }
+    };
+
+    useEffect(() => {
+      if (
+        selectedLaoTransporter === "Mixay" &&
+        formDataThaiLaos.weightThaiLaos &&
+        formDataThaiLaos.productTypeThaiLaos &&
+        formDataThaiLaos.widthThaiLaos &&
+        formDataThaiLaos.lengthThaiLaos &&
+        formDataThaiLaos.heightThaiLaos
+      ) {
+        console.log("🔄 Trigger การคำนวณราคาอัตโนมัติ");
+        calculateMixayPriceThaiLaos();
+      } else {
+        setMixayCalculatedPriceThaiLaos(null);
+      }
+      // eslint-disable-next-line
+    }, [
+      selectedLaoTransporter,
+      formDataThaiLaos.weightThaiLaos,
+      formDataThaiLaos.productTypeThaiLaos,
+      formDataThaiLaos.widthThaiLaos,
+      formDataThaiLaos.lengthThaiLaos,
+      formDataThaiLaos.heightThaiLaos
+    ]);
+
+    
 
     //------------------------------ Popup ลาว ------------------------------//
 
@@ -592,32 +1066,36 @@ const ShippingAdd: React.FC = () => {
 
     const [dropdownOpen, setDropdownOpen] = useState(false); // ควบคุมการแสดง dropdown
     const [searchTerm, setSearchTerm] = useState(''); // เก็บคำค้นหา
-    const [selectedProvinceId, setSelectedProvinceId] = useState<number | null>(null);
 
     const [receiverProvinceDropdownOpen, setReceiverProvinceDropdownOpen] = useState(false);
     const [receiverProvinceSearchTerm, setReceiverProvinceSearchTerm] = useState('');
     const [receiverSelectedProvinceId, setReceiverSelectedProvinceId] = useState<number | null>(null);
 
     const [districts, setDistricts] = useState<{ dr_id: number; dr_name: string; pr_id: number }[]>([]);
-    const [districtDropdownOpen, setDistrictDropdownOpen] = useState(false); // ควบคุมการแสดง dropdown
-    const [districtSearchTerm, setDistrictSearchTerm] = useState(''); // เก็บคำค้นหา
-    const [selectedDistrictId, setSelectedDistrictId] = useState<number | null>(null);
 
     const [receiverDistrictDropdownOpen, setReceiverDistrictDropdownOpen] = useState(false);
     const [receiverDistrictSearchTerm, setReceiverDistrictSearchTerm] = useState('');
-    const [receiverSelectedDistrictId, setReceiverSelectedDistrictId] = useState<number | null>(null);
     
     const [villages, setVillages] = useState<{ vill_id: number; vill_name: string; pr_id: number; dr_id: number}[]>([]);
-    const [villagesDropdownOpen, setvillagesDropdownOpen] = useState(false); // ควบคุมการแสดง dropdown
-    const [villagesSearchTerm, setvillagesSearchTerm] = useState(''); // เก็บคำค้นหา
-
-    const [receiverVillagesDropdownOpen, setReceiverVillagesDropdownOpen] = useState(false);
-    const [receiverVillagesSearchTerm, setReceiverVillagesSearchTerm] = useState('');
-    const [selectedReceiverVillageId, setSelectedReceiverVillageId] = useState<number | null>(null);
 
     const [branches, setBranches] = useState<{ id: number; name: string; province_id: number; district_id: number; village_id: number }[]>([]);
-    const [receiverBranchDropdownOpen, setReceiverBranchDropdownOpen] = useState(false);
-    const [receiverBranchSearchTerm, setReceiverBranchSearchTerm] = useState('');
+
+    // 🟢 State Variables สำหรับ ThaiLaos - ระบบค้นหาแขวง เมือง บ้าน สาขา
+    const [receiverProvinceSearchTermThaiLaos, setReceiverProvinceSearchTermThaiLaos] = useState('');
+    const [receiverDistrictSearchTermThaiLaos, setReceiverDistrictSearchTermThaiLaos] = useState('');
+    const [receiverVillagesSearchTermThaiLaos, setReceiverVillagesSearchTermThaiLaos] = useState('');
+    const [receiverBranchSearchTermThaiLaos, setReceiverBranchSearchTermThaiLaos] = useState('');
+    
+    // Selected ID states สำหรับ ThaiLaos
+    const [receiverSelectedProvinceIdThaiLaos, setReceiverSelectedProvinceIdThaiLaos] = useState<number | null>(null);
+    const [receiverSelectedDistrictIdThaiLaos, setReceiverSelectedDistrictIdThaiLaos] = useState<number | null>(null);
+    const [selectedReceiverVillageIdThaiLaos, setSelectedReceiverVillageIdThaiLaos] = useState<number | null>(null);
+    
+    // Dropdown open states สำหรับ ThaiLaos
+    const [receiverProvinceDropdownOpenThaiLaos, setReceiverProvinceDropdownOpenThaiLaos] = useState(false);
+    const [receiverDistrictDropdownOpenThaiLaos, setReceiverDistrictDropdownOpenThaiLaos] = useState(false);
+    const [receiverVillagesDropdownOpenThaiLaos, setReceiverVillagesDropdownOpenThaiLaos] = useState(false);
+    const [receiverBranchDropdownOpenThaiLaos, setReceiverBranchDropdownOpenThaiLaos] = useState(false);
 
     const [mixayCalculatedPrice, setMixayCalculatedPrice] = useState<number | null>(null);
 
@@ -629,56 +1107,56 @@ const ShippingAdd: React.FC = () => {
       province.pr_name.toLowerCase().includes(receiverProvinceSearchTerm.toLowerCase())
     );
 
-    const filteredDistricts = districts.filter((district) =>
-      (!selectedProvinceId || district.pr_id === selectedProvinceId) && // กรองตาม selectedProvinceId
-      district.dr_name.toLowerCase().includes(districtSearchTerm.toLowerCase()) // กรองตามคำค้นหา
-    );
-
     const filteredReceiverDistricts = districts.filter(
       (district) =>
         (!receiverSelectedProvinceId || district.pr_id === receiverSelectedProvinceId) &&
         district.dr_name.toLowerCase().includes(receiverDistrictSearchTerm.toLowerCase())
     );
 
-    const filteredVillages = villages.filter((village) => {
-      const isProvinceMatched = !selectedProvinceId || village.pr_id === selectedProvinceId;
-      const isDistrictMatched = !selectedDistrictId || village.dr_id === selectedDistrictId;
-      return isProvinceMatched && isDistrictMatched && village.vill_name.toLowerCase().includes(villagesSearchTerm.toLowerCase());
+    // 🟢 Filtered Variables สำหรับ ThaiLaos - ระบบกรองข้อมูล แขวง เมือง บ้าน สาขา
+    const filteredReceiverProvincesThaiLaos = provinces.filter((province) =>
+      province.pr_name.toLowerCase().includes(receiverProvinceSearchTermThaiLaos.toLowerCase())
+    );
+
+    const filteredReceiverDistrictsThaiLaos = districts.filter(
+      (district) =>
+        (!receiverSelectedProvinceIdThaiLaos || district.pr_id === receiverSelectedProvinceIdThaiLaos) &&
+        district.dr_name.toLowerCase().includes(receiverDistrictSearchTermThaiLaos.toLowerCase())
+    );
+
+    const filteredReceiverVillagesThaiLaos = villages.filter((village) => {
+      const isProvinceMatched = !receiverSelectedProvinceIdThaiLaos || village.pr_id === receiverSelectedProvinceIdThaiLaos;
+      const isDistrictMatched = !receiverSelectedDistrictIdThaiLaos || village.dr_id === receiverSelectedDistrictIdThaiLaos;
+      return isProvinceMatched && isDistrictMatched && village.vill_name.toLowerCase().includes(receiverVillagesSearchTermThaiLaos.toLowerCase());
     });
 
-    const filteredReceiverVillages = villages.filter((village) => {
-      const isProvinceMatched = !receiverSelectedProvinceId || village.pr_id === receiverSelectedProvinceId;
-      const isDistrictMatched = !receiverSelectedDistrictId || village.dr_id === receiverSelectedDistrictId;
-      return isProvinceMatched && isDistrictMatched && village.vill_name.toLowerCase().includes(receiverVillagesSearchTerm.toLowerCase());
-    });
-
-    const filteredReceiverBranches = branches.filter(item => {
-      const isProvinceMatched = !receiverSelectedProvinceId || item.province_id === receiverSelectedProvinceId;
-      const isDistrictMatched = !receiverSelectedDistrictId || item.district_id === receiverSelectedDistrictId;
-      const isVillageMatched = !selectedReceiverVillageId || item.village_id === selectedReceiverVillageId;
-      return ( isProvinceMatched && isDistrictMatched && isVillageMatched && item.name.toLowerCase().includes(receiverBranchSearchTerm.toLowerCase()) );
+    const filteredReceiverBranchesThaiLaos = branches.filter(item => {
+      const isProvinceMatched = !receiverSelectedProvinceIdThaiLaos || item.province_id === receiverSelectedProvinceIdThaiLaos;
+      const isDistrictMatched = !receiverSelectedDistrictIdThaiLaos || item.district_id === receiverSelectedDistrictIdThaiLaos;
+      const isVillageMatched = !selectedReceiverVillageIdThaiLaos || item.village_id === selectedReceiverVillageIdThaiLaos;
+      return ( isProvinceMatched && isDistrictMatched && isVillageMatched && item.name.toLowerCase().includes(receiverBranchSearchTermThaiLaos.toLowerCase()) );
     });
 
     async function fetchHalAccessToken() {
       try {
-        const response = await fetch(
-          `${HAL_API_URL}/oauth/token`,
+        const response = await axios.post(
+          '/api/hal/oauth/token',
           {
-            method: "POST",
+            client_id: HAL_API_CLIENT_ID,
+            client_secret: HAL_API_CLIENT_SECRET,
+            grant_type: HAL_API_GRANT_TYPE,
+            scope: HAL_API_SCOPE,
+            username: HAL_API_USERNAME,
+            password: HAL_API_PASSWORD,
+          },
+          {
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              client_id: HAL_API_CLIENT_ID,
-              client_secret: HAL_API_CLIENT_SECRET,
-              grant_type: HAL_API_GRANT_TYPE,
-              scope: HAL_API_SCOPE,
-              username: HAL_API_USERNAME,
-              password: HAL_API_PASSWORD,
-            }),
           }
         );
-        const data = await response.json();
+        
+        const data = response.data;
         console.debug("HAL API Response:", data);
         if (data.access_token) {
           localStorage.setItem("access_token_HAL", data.access_token);
@@ -694,17 +1172,20 @@ const ShippingAdd: React.FC = () => {
 
     async function fetchMixayToken() {
       try {
-        const response = await fetch(`${MIXAY_URL}/api/auth/login`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
+        const response = await axios.post(
+          `${MIXAY_URL}/api/auth/login`,
+          {
             username: MIXAY_USERNAME,
             password: MIXAY_PASSWORD,
-          }),
-        });
-        const data = await response.json();
+          },
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        
+        const data = response.data;
         if (data.success && data.data?.authorization?.token) {
           localStorage.setItem("mixay_token", data.data.authorization.token);
         }
@@ -722,10 +1203,9 @@ const ShippingAdd: React.FC = () => {
       }
 
       try {
-        const response = await fetch(
+        const response = await axios.get(
           "https://new.mixayexpress.com/api/v1/ex_parcel/getDropship?status=true",
           {
-            method: "GET",
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${token}`, // ใส่ Bearer Token ใน header
@@ -733,91 +1213,87 @@ const ShippingAdd: React.FC = () => {
           }
         );
 
-        const result = await response.json();
+        const result = response.data;
 
-        if (response.ok) {
-          console.log("ข้อมูลจาก API ทั้งหมด:", result);
+        console.log("ข้อมูลจาก API ทั้งหมด:", result);
 
-          const provinces = Array.from(
-            new Map(
-              result.data
-                .filter((item: DropshipItem) => item.province?.pr_name) // กรองเฉพาะข้อมูลที่มี `pr_name`
-                .map((item: DropshipItem) => [item.province?.pr_id, { pr_id: item.province?.pr_id, pr_name: item.province?.pr_name }]) // ใช้ Map เพื่อเก็บข้อมูลที่ไม่ซ้ำ
-            ).values()
-          );
-          setProvinces(provinces as { pr_id: number; pr_name: string }[]);
+        const provinces = Array.from(
+          new Map(
+            result.data
+              .filter((item: DropshipItem) => item.province?.pr_name) // กรองเฉพาะข้อมูลที่มี `pr_name`
+              .map((item: DropshipItem) => [item.province?.pr_id, { pr_id: item.province?.pr_id, pr_name: item.province?.pr_name }]) // ใช้ Map เพื่อเก็บข้อมูลที่ไม่ซ้ำ
+          ).values()
+        );
+        setProvinces(provinces as { pr_id: number; pr_name: string }[]);
 
-          const districts = Array.from(
-            new Map(
-              result.data
-                .filter((item: DropshipItem) => item.dristric?.dr_name && item.province?.pr_id !== undefined)
-                .map((item: DropshipItem) => [
-                  item.dristric?.dr_id,
-                  {
-                    dr_id: item.dristric?.dr_id,
-                    dr_name: item.dristric?.dr_name,
-                    pr_id: item.province?.pr_id,
-                  },
-                ])
-            ).values()
-          );
-          setDistricts(districts as { dr_id: number; dr_name: string; pr_id: number }[]);
+        const districts = Array.from(
+          new Map(
+            result.data
+              .filter((item: DropshipItem) => item.dristric?.dr_name && item.province?.pr_id !== undefined)
+              .map((item: DropshipItem) => [
+                item.dristric?.dr_id,
+                {
+                  dr_id: item.dristric?.dr_id,
+                  dr_name: item.dristric?.dr_name,
+                  pr_id: item.province?.pr_id,
+                },
+              ])
+          ).values()
+        );
+        setDistricts(districts as { dr_id: number; dr_name: string; pr_id: number }[]);
 
-          const villages = Array.from(
-            new Map(
-              result.data
-                .filter((item: DropshipItem) => item.village?.vill_name) // กรองเฉพาะข้อมูลที่มี `pr_name`
-                .map((item: DropshipItem) => [
-                  item.village?.vill_id,
-                  {
-                    vill_id: item.village?.vill_id,
-                    vill_name: item.village?.vill_name,
-                    pr_id: item.province?.pr_id,
-                    dr_id: item.dristric?.dr_id,
-                  },
-                ])
-            ).values()
-          );
-          setVillages(villages as { vill_id: number; vill_name: string; pr_id: number; dr_id: number }[]);
+        const villages = Array.from(
+          new Map(
+            result.data
+              .filter((item: DropshipItem) => item.village?.vill_name) // กรองเฉพาะข้อมูลที่มี `pr_name`
+              .map((item: DropshipItem) => [
+                item.village?.vill_id,
+                {
+                  vill_id: item.village?.vill_id,
+                  vill_name: item.village?.vill_name,
+                  pr_id: item.province?.pr_id,
+                  dr_id: item.dristric?.dr_id,
+                },
+              ])
+          ).values()
+        );
+        setVillages(villages as { vill_id: number; vill_name: string; pr_id: number; dr_id: number }[]);
 
-          interface BranchItem {
-            id: number;
-            name: string;
-            province_id: number;
-            district_id: number;
-            village_id: number;
-            [key: string]: unknown;
-          }
-
-          const branches = (result.data as BranchItem[])
-            .filter((item: BranchItem) => item.name && item.id && item.province_id && item.district_id && item.village_id)
-            .map((item: BranchItem) => ({
-              id: Number(item.id),
-              name: item.name,
-              province_id: Number(item.province_id),
-              district_id: Number(item.district_id),
-              village_id: Number(item.village_id)
-            }));
-          setBranches(branches);
-
-          type DropshipItem = {
-            province?: { pr_id?: string | number; pr_name?: string };
-            pr_id?: string | number;
-            pr_name?: string;
-            district?: { dr_id?: string | number; dr_name?: string };
-            dristric?: { dr_id?: string | number; dr_name?: string };
-            dr_id?: string | number;
-            dr_name?: string;
-            village?: { vill_id?: string | number; vill_name?: string };
-            vill_id?: string | number;
-            vill_name?: string;
-            [key: string]: unknown;
-          };
-
-          
-        } else {
-          console.error("Error fetching Mixay Dropship data:", result);
+        interface BranchItem {
+          id: number;
+          name: string;
+          province_id: number;
+          district_id: number;
+          village_id: number;
+          [key: string]: unknown;
         }
+
+        const branches = (result.data as BranchItem[])
+          .filter((item: BranchItem) => item.name && item.id && item.province_id && item.district_id && item.village_id)
+          .map((item: BranchItem) => ({
+            id: Number(item.id),
+            name: item.name,
+            province_id: Number(item.province_id),
+            district_id: Number(item.district_id),
+            village_id: Number(item.village_id)
+          }));
+        setBranches(branches);
+
+        type DropshipItem = {
+          province?: { pr_id?: string | number; pr_name?: string };
+          pr_id?: string | number;
+          pr_name?: string;
+          district?: { dr_id?: string | number; dr_name?: string };
+          dristric?: { dr_id?: string | number; dr_name?: string };
+          dr_id?: string | number;
+          dr_name?: string;
+          village?: { vill_id?: string | number; vill_name?: string };
+          vill_id?: string | number;
+          vill_name?: string;
+          [key: string]: unknown;
+        };
+
+        
       } catch (error) {
         console.error("Fetch Error:", error);
       }
@@ -853,15 +1329,18 @@ const ShippingAdd: React.FC = () => {
 
       try {
         const token = localStorage.getItem("mixay_token");
-        const res = await fetch(`${MIXAY_URL}/api/v1/ex_parcel/add_ex_parcel/cal`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json();
+        const response = await axios.post(
+          `${MIXAY_URL}/api/v1/ex_parcel/add_ex_parcel/cal`,
+          payload,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        
+        const data = response.data;
         console.log("คำนวนราคา:", data);
         setMixayCalculatedPrice(data.data?.price ?? null);
       } catch (e) {
@@ -900,16 +1379,68 @@ const ShippingAdd: React.FC = () => {
 
       try {
         const token = localStorage.getItem("mixay_token");
-        const res = await fetch(`${MIXAY_URL}/api/v1/ex_parcel/add_ex_parcel/add`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json();
+        const response = await axios.post(
+          `${MIXAY_URL}/api/v1/ex_parcel/add_ex_parcel/add`,
+          payload,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        
+        const data = response.data;
         console.log("พัสดุภายนอกเข้าระบบ Mixay:", data);
+
+        console.log("🔍 DEBUG formDataLaos ก่อนส่งไป mapMixayResponseToTable:", {
+          senderName: formDataLaos.senderNameLaos,
+          senderPhone: formDataLaos.senderPhoneLaos,
+          receiverName: formDataLaos.receiverNameLaos,
+          receiverPhone: formDataLaos.receiverPhoneLaos,
+          senderAddress: [
+            formDataLaos.senderAddressLaos,
+            formDataLaos.senderProvincestLaos,
+            formDataLaos.senderDistricLaos,
+            formDataLaos.senderVillagesLaos
+          ].filter(Boolean).join(' '),
+          receiverAddress: formDataLaos.receiverAddressLaos,
+          weight: parseFloat(formDataLaos.weightLaos) || 0,
+          width: parseFloat(formDataLaos.widthLaos) || 0,
+          length: parseFloat(formDataLaos.lengthLaos) || 0,
+          height: parseFloat(formDataLaos.heightLaos) || 0,
+        });
+
+        // เพิ่มข้อมูลลงตาราง
+        if (data.status && data.parcel) {
+          const newParcelData = mapMixayResponseToTable(data, selectedTransporter || "Mixay", {
+            // ✅ ส่งข้อมูลเบอร์โทรและข้อมูลอื่นๆ
+            senderPhone: formDataLaos.senderPhoneLaos,
+            receiverPhone: formDataLaos.receiverPhoneLaos,
+            senderName: formDataLaos.senderNameLaos,
+            receiverName: formDataLaos.receiverNameLaos,
+            senderAddress: [
+              formDataLaos.senderAddressLaos,
+              formDataLaos.senderProvincestLaos,
+              formDataLaos.senderDistricLaos,
+              formDataLaos.senderVillagesLaos
+            ].filter(Boolean).join(' '),
+            receiverAddress: formDataLaos.receiverAddressLaos,
+            weight: parseFloat(formDataLaos.weightLaos) || 0,
+            width: parseFloat(formDataLaos.widthLaos) || 0,
+            length: parseFloat(formDataLaos.lengthLaos) || 0,
+            height: parseFloat(formDataLaos.heightLaos) || 0,
+          });
+
+          // 🔍 Debug ข้อมูลที่ได้จาก mapMixayResponseToTable
+          console.log("🔍 DEBUG newParcelData จาก mapMixayResponseToTable:", newParcelData);
+          console.log("🔍 DEBUG เบอร์โทรใน newParcelData:", {
+            senderPhone: newParcelData.senderPhone,
+            receiverPhone: newParcelData.receiverPhone
+          });
+
+          setParcelData(prev => [...prev, newParcelData]);
+        }
         // คุณสามารถแจ้งเตือนหรืออัปเดต UI ตามผลลัพธ์ที่ได้
       } catch (e) {
         console.error("Add Parcel Error:", e);
@@ -1070,22 +1601,39 @@ const ShippingAdd: React.FC = () => {
 
     const handleLaosInputChange = (
       e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
-      fieldName: string
+      fieldName: string,
+      isThaiLaos: boolean = false // เพิ่มพารามิเตอร์นี้
     ) => {
       const { value } = e.target;
-    
-      // อัปเดตค่าใน formDataLaos
-      setFormDataLaos((prevFormData) => ({
-        ...prevFormData,
-        [fieldName]: value,
-      }));
-    
-      // ลบข้อความแจ้งเตือนของฟิลด์ที่กำลังกรอก
-      if (errorsLaos[fieldName]) {
-        setErrorsLaos((prevErrors) => ({
-          ...prevErrors,
-          [fieldName]: '',
+
+      if (isThaiLaos) {
+        // อัปเดตค่าใน formDataThaiLaos
+        setFormDataThaiLaos((prevFormData) => ({
+          ...prevFormData,
+          [fieldName]: value,
         }));
+
+        // ลบข้อความแจ้งเตือนของฟิลด์ที่กำลังกรอก
+        if (errorsThaiLaos[fieldName]) {
+          setErrorsThaiLaos((prevErrors) => ({
+            ...prevErrors,
+            [fieldName]: '',
+          }));
+        }
+      } else {
+        // อัปเดตค่าใน formDataLaos (เดิม)
+        setFormDataLaos((prevFormData) => ({
+          ...prevFormData,
+          [fieldName]: value,
+        }));
+
+        // ลบข้อความแจ้งเตือนของฟิลด์ที่กำลังกรอก
+        if (errorsLaos[fieldName]) {
+          setErrorsLaos((prevErrors) => ({
+            ...prevErrors,
+            [fieldName]: '',
+          }));
+        }
       }
     };
 
@@ -1326,11 +1874,28 @@ const ShippingAdd: React.FC = () => {
         {/* Row 2 */}
         <div className="grid grid-cols-3 gap-4">
           {/* Part 1: Outstanding Amount */}
-          <div className="bg-white p-4 rounded-lg shadow col-span-3">
-            <h2 className="text-lg font-bold">ยอดที่ต้องชำระ</h2>
-            <p className="text-4xl font-medium text-right">
-              {formatNumberWithCommas(2000)} บาท
-            </p>
+          <div className="bg-white p-4 rounded-lg shadow col-span-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold">ยอดที่ต้องชำระ</h2>
+            </div>
+            <div className="flex items-center gap-4">
+              <p className="text-4xl font-medium text-right">
+                {formatNumberWithCommas(totalTHB)} บาท
+                {" / "}
+                {formatNumberWithCommas(totalLAK)} กีบ
+              </p>
+              <button
+                className={`font-bold py-3 px-8 rounded-lg text-lg shadow transition-all duration-200
+                  ${parcelData.length === 0
+                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                    : 'bg-green-500 hover:bg-green-600 text-white'}
+                `}
+                onClick={() => setShowPaymentPopup(true)}
+                disabled={parcelData.length === 0}
+              >
+                ชำระเงิน
+              </button>
+            </div>
           </div>
 
           {/* Part 2: Table */}
@@ -1338,29 +1903,44 @@ const ShippingAdd: React.FC = () => {
             <table className="table-auto w-full text-left border-collapse text-sm">
               <thead className="sticky top-0 bg-[#E52525] text-white z-10 ">
                 <tr>
-                  <th className="px-4 py-2 border">เลขพัสดุ</th>
-                  <th className="px-4 py-2 border">ลายชื่อ ผู้ส่ง/ผู้รับ</th>
-                  <th className="px-4 py-2 border">การจัดส่ง</th>
-                  <th className="px-4 py-2 border">ราคาขนส่งมิตรถาพ</th>
-                  <th className="px-4 py-2 border">ราคาขนส่งภายนอก THB</th>
-                  <th className="px-4 py-2 border">ราคาขนส่งภายนอก LAK</th>
-                  <th className="px-4 py-2 border">ราคารวม THB</th>
-                  <th className="px-4 py-2 border">ราคารวม LAK</th>
-                  <th className="px-4 py-2 border">ลบ</th>
+                  <th className="px-4 py-2 border w-[150px] text-center">เลขพัสดุ</th>
+                  <th className="px-4 py-2 border w-[210px] text-center">ลายชื่อ ผู้ส่ง/ผู้รับ</th>
+                  <th className="px-2 py-2 border w-[100px] text-center">การจัดส่ง</th>
+                  <th className="px-2 py-2 border w-[80px] text-center">ราคาขนส่งมิตรถาพ</th>
+                  <th className="px-2 py-2 border w-[90px] text-center">ราคาขนส่งภายนอก THB</th>
+                  <th className="px-2 py-2 border w-[90px] text-center">ราคาขนส่งภายนอก LAK</th>
+                  <th className="px-2 py-2 border w-[90px] text-center">ราคารวม THB</th>
+                  <th className="px-2 py-2 border w-[90px] text-center">ราคารวม LAK</th>
+                  <th className="px-2 py-2 border w-[60px] text-center">ลบ</th>
                 </tr>
               </thead>
               <tbody>
                 {parcelData.map((data, index) => (
                   <tr key={index}>
-                    <td className="px-4 py-2 border">{data.parcelNumber}</td>
-                    <td className="px-4 py-2 border">{data.senderReceiver}</td>
-                    <td className="px-4 py-2 border">{data.deliveryType}</td>
-                    <td className="px-4 py-2 border">{formatNumberWithCommas(data.friendlyPrice)}</td>
-                    <td className="px-4 py-2 border">{formatNumberWithCommas(data.externalPriceTHB)}</td>
-                    <td className="px-4 py-2 border">{formatNumberWithCommas(data.externalPriceLAK)}</td>
-                    <td className="px-4 py-2 border">{formatNumberWithCommas(data.totalPriceTHB)}</td>
-                    <td className="px-4 py-2 border">{formatNumberWithCommas(data.totalPriceLAK)}</td>
-                    <td className="px-4 py-2 border text-center">
+                    <td className="px-4 py-2 border w-[150px] text-center">{data.parcelNumber}</td>
+                    <td className="px-4 border w-[210px] text-center">
+                      <span
+                        dangerouslySetInnerHTML={{ __html: data.senderReceiver }}
+                        style={{ display: "block", whiteSpace: "pre-line" }}
+                      />
+                    </td>
+                    <td className="px-2 py-2 border w-[100px] text-center">{data.deliveryType}</td>
+                    <td className="px-2 py-2 border w-[80px] text-center">{formatNumberWithCommas(data.mitaparpPrice)}</td>
+                    <td className="px-2 py-2 border w-[90px] text-center">{formatNumberWithCommas(data.externalPriceTHB)}</td>
+                    <td className="px-2 py-2 border w-[90px] text-center">{formatNumberWithCommas(data.externalPriceLAK)}</td>
+                    <td className="px-2 py-2 border w-[90px] text-center">
+                      {
+                        // ราคารวม THB = 150 + mitaparpPriceTHB (200)
+                        formatNumberWithCommas((data.externalPriceTHB || 0) + (data.mitaparpPriceTHB || 0))
+                      }
+                    </td>
+                    <td className="px-2 py-2 border w-[90px] text-center">
+                      {
+                        // ราคารวม LAK = ราคาขนส่งมิตรถาพ + ราคาขนส่งภายนอก LAK
+                        formatNumberWithCommas((data.mitaparpPrice || 0) + (data.externalPriceLAK || 0))
+                      }
+                    </td>
+                    <td className="px-2 py-2 border text-center w-[60px]">
                       <button
                         onClick={() => openDeleteConfirmation(data.parcelNumber)}
                         className="text-red-500 hover:text-red-700"
@@ -1379,15 +1959,21 @@ const ShippingAdd: React.FC = () => {
                 <div className="grid grid-cols-3 gap-4">
                     <div className="text-center">
                         <p className="font-bold">ยอดรวม (ราคาขนส่งมิตรถาพ)</p>
-                        <p className="font-medium">{formatNumberWithCommas(2000)} บาท</p>
+                        <p className="font-medium">
+                          {formatNumberWithCommas(parcelData.reduce((sum, item) => sum + (item.mitaparpPriceTHB || 0), 0))} บาท / {formatNumberWithCommas(parcelData.reduce((sum, item) => sum + (item.mitaparpPrice || 0), 0))} กีบ
+                        </p>
                     </div>
                     <div className="text-center">
-                        <p className="font-bold">ยอดรวม (ราคารวม THB)</p>
-                        <p className="font-medium">{formatNumberWithCommas(2000)} บาท</p>
+                      <p className="font-bold">ยอดรวม (ราคารวม THB)</p>
+                      <p className="font-medium">
+                        {formatNumberWithCommas(totalTHB)} บาท
+                      </p>
                     </div>
                     <div className="text-center">
-                        <p className="font-bold">ยอดรวม (ราคารวม LAK)</p>
-                        <p className="font-medium">{formatNumberWithCommas(50000)}</p>
+                      <p className="font-bold">ยอดรวม (ราคารวม LAK)</p>
+                      <p className="font-medium">
+                        {formatNumberWithCommas(totalLAK)} กีบ
+                      </p>
                     </div>
                 </div>
             </div>
@@ -1522,7 +2108,7 @@ const ShippingAdd: React.FC = () => {
         {/* แสดงรายชื่อขนส่งในไทย-ลาว */}
         {selectedTransporter === 'thai-lao' && (
           <div className="mt-4 grid grid-cols-3 gap-4 h-[560px] overflow-y-scroll bg-gray-50 p-2 rounded-lg shadow-inner">
-            {thaiTransporters.map((transporter, index) => (
+            {thaiLaosTransporters.map((transporter, index) => (
               <div
                 key={index}
                 className={`relative p-2 rounded-lg shadow flex flex-col items-center transition-all duration-300 ${
@@ -1620,6 +2206,7 @@ const ShippingAdd: React.FC = () => {
               </div>
             ))}
           </div>
+          
         )}
 
         {/* popup ยืนยันการลบ */}
@@ -1652,6 +2239,7 @@ const ShippingAdd: React.FC = () => {
         )}
         
       </div>
+      
 
       {popupThai && (
         <>
@@ -1699,7 +2287,7 @@ const ShippingAdd: React.FC = () => {
                       <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 max-h-40 overflow-y-auto w-full">
                         {senderResult.map((item, idx) => (
                           <div key={idx} className="p-2 hover:bg-gray-100 cursor-pointer" onClick={() => handleSenderResultSelect(item)}>
-                            {Object.keys(zipData).find((key) => zipData[key].includes(item))}, 
+                            {findZipCodeByItem(item)}, 
                             จังหวัด: {item.จังหวัด}, อำเภอ: {item.อำเภอ}, ตำบล: {item.ตำบล}
                           </div>
                         ))}
@@ -1736,7 +2324,7 @@ const ShippingAdd: React.FC = () => {
                       <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 max-h-40 overflow-y-auto w-full">
                         {receiverResult.map((item, idx) => (
                           <div key={idx} className="p-2 hover:bg-gray-100 cursor-pointer" onClick={() => handleReceiverResultSelect(item)}>
-                            {Object.keys(zipData).find((key) => zipData[key].includes(item))}, 
+                            {findZipCodeByItem(item)}, 
                             จังหวัด: {item.จังหวัด}, อำเภอ: {item.อำเภอ}, ตำบล: {item.ตำบล}
                           </div>
                         ))}
@@ -1757,8 +2345,8 @@ const ShippingAdd: React.FC = () => {
                 {/* ประเภทสินค้า */}
                 <div className="mb-1">
                   <label className="block mb-2" >ประเภทสินค้า</label>
-                    <select className="w-full border border-gray-300 rounded-lg p-2 text-sm" defaultValue="" value={formDataThai.productTypeThai} onChange={(e) => handleThaiInputChange(e, 'productTypeThai')}>
-                    <option value="" disabled>เลือกประเภทสินค้า</option>
+                    <select className="w-full border border-gray-300 rounded-lg p-2 text-sm" value={formDataThai.productTypeThai} onChange={(e) => handleThaiInputChange(e, 'productTypeThai')}>
+                    <option value="">เลือกประเภทสินค้า</option>
                     <option value="เอกสาร">เอกสาร</option>
                     <option value="อาหารแห้ง">อาหารแห้ง</option>
                     <option value="ของใช้">ของใช้</option>
@@ -1806,14 +2394,30 @@ const ShippingAdd: React.FC = () => {
               <div className="grid grid-cols-2 gap-4 mt-2">
                 {/* ขนาดกล่อง */}
                 <div>
-                  <label className="block text-sm mb-1">ขนาดกล่อง</label>
-                  <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="ขนาดกล่อง"/>
+                  <label className="block text-sm mb-1">ขนาดกล่อง (ลบ.ซม.)</label>
+                  <input 
+                    type="text" 
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-gray-100" 
+                    placeholder="กว้าง x ยาว x สูง"
+                    value={
+                      formDataThai.widthThai && formDataThai.lengthThai && formDataThai.heightThai
+                        ? `${parseFloat(formDataThai.widthThai) * parseFloat(formDataThai.lengthThai) * parseFloat(formDataThai.heightThai)} ลบ.ซม.`
+                        : ""
+                    }
+                    readOnly
+                  />
                 </div>
 
                 {/* ราคาที่คำนวนได้ */}
                 <div>
                   <label className="block text-sm mb-1">ราคาที่คำนวนได้ (บาท)</label>
-                  <input type="number" className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="ราคา" readOnly/>
+                  <input 
+                    type="text" 
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-gray-100" 
+                    placeholder="ราคาจะแสดงหลังจากจอง"
+                    value={formDataThai.calculatedPrice || ""}
+                    readOnly
+                  />
                 </div>
               </div>
             </div>
@@ -1845,7 +2449,17 @@ const ShippingAdd: React.FC = () => {
                 className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
                 onClick={() => {
                   if (validateThaiPopupInputs()) {
-                    console.log("ข้อมูลที่กรอก:", formDataThai); 
+                    console.log("ข้อมูลที่กรอก:", formDataThai);
+                    // เพิ่ม log ดูค่า courier_code
+                    const courierCode = getCourierCode(selectedTransporter || "");
+                    console.log("courierCode ที่จะส่ง:", courierCode);
+                    if (courierCode) {
+                      bookThaiParcel(courierCode);
+                    } else {
+                      alert("กรุณาเลือกขนส่งที่รองรับ");
+                    }
+                    closePopupThai();
+                    resetFormThai();
                   } else {
                     console.log("ข้อมูลไม่ครบถ้วนหรือไม่ถูกต้อง");
                   }
@@ -1869,7 +2483,7 @@ const ShippingAdd: React.FC = () => {
           ></div>
 
           {/* Popup Content */}
-          <div className="fixed top-0 right-0 h-full w-1/3 bg-white shadow-lg z-50 p-4 overflow-y-auto">
+          <div className="fixed top-0 right-0 h-full w-3/6 bg-white shadow-lg z-50 p-4 overflow-y-auto">
             {/* Header */}
             <div className="p-0 border-b mb-2">
               <h2 className="text-2xl font-bold mb-3 flex items-center">
@@ -1968,7 +2582,7 @@ const ShippingAdd: React.FC = () => {
                           <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 max-h-40 overflow-y-auto w-full">
                             {senderResultThaiLaos.map((item, idx) => (
                               <div key={idx} className="p-2 hover:bg-gray-100 cursor-pointer" onClick={() => handleSenderResultSelectThaiLaos(item)}>
-                                {Object.keys(zipData).find((key) => zipData[key].includes(item))}, 
+                                {findZipCodeByItem(item)}, 
                                 จังหวัด: {item.จังหวัด}, อำเภอ: {item.อำเภอ}, ตำบล: {item.ตำบล}
                               </div>
                             ))}
@@ -2000,21 +2614,174 @@ const ShippingAdd: React.FC = () => {
                       {errorsThaiLaos.receiverAddressThaiLaos && (<p className="text-red-500 text-sm mt-1">{errorsThaiLaos.receiverAddressThaiLaos}</p>)}
                     </div>
                     <div className="grid grid-cols-2 gap-4 mb-1">
-                      <div>
-                        <label className="block text-sm mb-1">บ้าน</label>
-                        <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="บ้านผู้รับ" value={formDataThaiLaos.receiverVillagesThaiLaos} onChange={(e) => handleThaiLaosInputChange(e, 'receiverVillagesThaiLaos')}/>
-                        {errorsThaiLaos.receiverVillagesThaiLaos && (<p className="text-red-500 text-sm mt-1">{errorsThaiLaos.receiverVillagesThaiLaos}</p>)}
+                      <div className="mb-1">
+                        <label className="block text-sm mb-1">แขวง</label>
+                        <div className="relative">
+                          <input 
+                            type="text" 
+                            className="w-full border border-gray-300 rounded-lg p-2 text-sm" 
+                            placeholder="ค้นหาและเลือกแขวง" 
+                            value={formDataThaiLaos.receiverProvincestThaiLaos}
+                            onChange={(e) => { 
+                              setReceiverProvinceSearchTermThaiLaos(e.target.value); 
+                              handleThaiLaosLocationInputChange(e, 'receiverProvincestThaiLaos', true);
+                            }}
+                            onFocus={() => setReceiverProvinceDropdownOpenThaiLaos(true)}
+                            onBlur={() => setTimeout(() => setReceiverProvinceDropdownOpenThaiLaos(false), 200)}
+                          />
+                          {receiverProvinceDropdownOpenThaiLaos && filteredReceiverProvincesThaiLaos.length > 0 && (
+                            <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 max-h-40 overflow-y-auto w-full">
+                              {filteredReceiverProvincesThaiLaos.map((province) => (
+                                <div key={province.pr_id} className="p-2 hover:bg-gray-100 cursor-pointer"
+                                onClick={() => {
+                                    setFormDataThaiLaos((prev) => ({ ...prev, receiverProvincestThaiLaos: province.pr_name }));
+                                    setReceiverProvinceSearchTermThaiLaos(province.pr_name);
+                                    setReceiverSelectedProvinceIdThaiLaos(province.pr_id);
+                                    setReceiverProvinceDropdownOpenThaiLaos(false);
+                                    // Reset lower levels when province changes
+                                    setFormDataThaiLaos((prev) => ({
+                                      ...prev,
+                                      receiverProvincestThaiLaos: province.pr_name,
+                                      receiverDistricThaiLaos: '',
+                                      receiverVillagesThaiLaos: '',
+                                      receiverBranchThaiLaos: '',
+                                    }));
+                                    setReceiverDistrictSearchTermThaiLaos('');
+                                    setReceiverVillagesSearchTermThaiLaos('');
+                                    setReceiverBranchSearchTermThaiLaos('');
+                                    setReceiverSelectedDistrictIdThaiLaos(null);
+                                    setSelectedReceiverVillageIdThaiLaos(null);
+                                  }}
+                                >
+                                  {province.pr_name}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {errorsThaiLaos.receiverProvincestThaiLaos && ( <p className="text-red-500 text-sm mt-1">{errorsThaiLaos.receiverProvincestThaiLaos}</p> )}
+                        </div>
                       </div>
-                      <div>
+                      <div className="mb-1">
                         <label className="block text-sm mb-1">เมือง</label>
-                        <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="เมืองผู้รับ" value={formDataThaiLaos.receiverDistricThaiLaos} onChange={(e) => handleThaiLaosInputChange(e, 'receiverDistricThaiLaos')}/>
-                        {errorsThaiLaos.receiverDistricThaiLaos && (<p className="text-red-500 text-sm mt-1">{errorsThaiLaos.receiverDistricThaiLaos}</p>)}
+                        <div className="relative">
+                          <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="ค้นหาและเลือกเมือง" value={formDataThaiLaos.receiverDistricThaiLaos}
+                            onChange={(e) => {
+                              setReceiverDistrictSearchTermThaiLaos(e.target.value);
+                              handleThaiLaosLocationInputChange(e, 'receiverDistricThaiLaos', true);
+                            }}
+                            onFocus={() => setReceiverDistrictDropdownOpenThaiLaos(true)}
+                            onBlur={() => setTimeout(() => setReceiverDistrictDropdownOpenThaiLaos(false), 200)}
+                          />
+                          {receiverDistrictDropdownOpenThaiLaos && filteredReceiverDistrictsThaiLaos.length > 0 && (
+                            <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 max-h-40 overflow-y-auto w-full">
+                              {filteredReceiverDistrictsThaiLaos.map((district) => (
+                                <div key={district.dr_id} className="p-2 hover:bg-gray-100 cursor-pointer"
+                                  onClick={() => {
+                                    setFormDataThaiLaos((prev) => ({ 
+                                      ...prev, 
+                                      receiverDistricThaiLaos: district.dr_name,
+                                      receiverVillagesThaiLaos: '',
+                                      receiverBranchThaiLaos: '',
+                                    }));
+                                    setReceiverDistrictSearchTermThaiLaos(district.dr_name);
+                                    setReceiverSelectedDistrictIdThaiLaos(district.dr_id);
+                                    setReceiverDistrictDropdownOpenThaiLaos(false);
+                                    // Reset lower levels when district changes
+                                    setReceiverVillagesSearchTermThaiLaos('');
+                                    setReceiverBranchSearchTermThaiLaos('');
+                                    setSelectedReceiverVillageIdThaiLaos(null);
+                                  }}
+                                >
+                                  {district.dr_name}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {errorsThaiLaos.receiverDistricThaiLaos && ( <p className="text-red-500 text-sm mt-1">{errorsThaiLaos.receiverDistricThaiLaos}</p> )}
+                        </div>
                       </div>
                     </div>
-                    <div className="mb-1">
-                      <label className="block text-sm mb-1">แขวง</label>
-                      <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="แขวงผู้รับ" value={formDataThaiLaos.receiverProvincestThaiLaos} onChange={(e) => handleThaiLaosInputChange(e, 'receiverProvincestThaiLaos')}/>
-                      {errorsThaiLaos.receiverProvincestThaiLaos && (<p className="text-red-500 text-sm mt-1">{errorsThaiLaos.receiverProvincestThaiLaos}</p>)}
+                    <div className="grid grid-cols-2 gap-4 mb-1">
+                      <div className="mb-1">
+                        <label className="block text-sm mb-1">บ้าน</label>
+                        <div className="relative">
+                          <input  type="text"  className="w-full border border-gray-300 rounded-lg p-2 text-sm"  placeholder="ค้นหาและเลือกบ้าน"  value={receiverVillagesSearchTermThaiLaos}
+                            onChange={(e) => {
+                              setReceiverVillagesSearchTermThaiLaos(e.target.value);
+                              handleThaiLaosLocationInputChange(e, 'receiverVillagesThaiLaos', true);
+                            }}
+                            onFocus={() => setReceiverVillagesDropdownOpenThaiLaos(true)}
+                            onBlur={() => setTimeout(() => setReceiverVillagesDropdownOpenThaiLaos(false), 200)}
+                          />
+                          {receiverVillagesDropdownOpenThaiLaos && filteredReceiverVillagesThaiLaos.length > 0 && (
+                            <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 max-h-40 overflow-y-auto w-full">
+                              {filteredReceiverVillagesThaiLaos.map((village) => (
+                                <div key={village.vill_id} className="p-2 hover:bg-gray-100 cursor-pointer"
+                                  onClick={() => {
+                                    setFormDataThaiLaos((prev) => ({ 
+                                      ...prev, 
+                                      receiverVillagesThaiLaos: village.vill_name,
+                                      receiverBranchThaiLaos: '',
+                                    }));
+                                    setReceiverVillagesSearchTermThaiLaos(village.vill_name);
+                                    setSelectedReceiverVillageIdThaiLaos(village.vill_id);
+                                    setReceiverVillagesDropdownOpenThaiLaos(false);
+                                    // Reset lower levels when village changes
+                                    setReceiverBranchSearchTermThaiLaos('');
+                                  }}
+                                >
+                                  {village.vill_name}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {errorsThaiLaos.receiverVillagesThaiLaos && ( <p className="text-red-500 text-sm mt-1">{errorsThaiLaos.receiverVillagesThaiLaos}</p> )}
+                        </div>
+                      </div>
+                      <div className="mb-1">
+                        <label className="block text-sm mb-1">สาขา</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+                            placeholder="ค้นหาและเลือกสาขา"
+                            value={receiverBranchSearchTermThaiLaos}
+                            onChange={e => {
+                              setReceiverBranchSearchTermThaiLaos(e.target.value);
+                              handleThaiLaosLocationInputChange(e, 'receiverBranchThaiLaos', false);
+                            }}
+                            onFocus={() => setReceiverBranchDropdownOpenThaiLaos(true)}
+                            onBlur={() => setTimeout(() => setReceiverBranchDropdownOpenThaiLaos(false), 200)}
+                          />
+                          {receiverBranchDropdownOpenThaiLaos && filteredReceiverBranchesThaiLaos.length > 0 && (
+                            <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 max-h-40 overflow-y-auto w-full">
+                              {filteredReceiverBranchesThaiLaos.map(branch => (
+                                <div
+                                  key={branch.id}
+                                  className="p-2 hover:bg-gray-100 cursor-pointer"
+                                  onClick={() => {
+                                    setFormDataThaiLaos(prev => ({
+                                      ...prev,
+                                      receiverBranchThaiLaos: branch.name,
+                                      receiverBranchThaiLaosId: branch.id,
+                                      receiverProvinceId: branch.province_id,
+                                      receiverDistrictId: branch.district_id,
+                                      receiverVillageId: branch.village_id,
+                                    }));
+                                    setReceiverBranchSearchTermThaiLaos(branch.name);
+                                    setReceiverBranchDropdownOpenThaiLaos(false);
+                                  }}
+                                >
+                                  {branch.name}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {errorsThaiLaos.receiverBranchThaiLaos && (
+                            <p className="text-red-500 text-sm mt-1">{errorsThaiLaos.receiverBranchThaiLaos}</p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2028,7 +2795,7 @@ const ShippingAdd: React.FC = () => {
                     <div>
                       <label className="block text-sm mb-1">ประเภทสินค้า</label>
                       <select className="w-full border border-gray-300 rounded-lg p-2 text-sm " value={formDataThaiLaos.productTypeThaiLaos} onChange={(e) => handleThaiLaosInputChange(e, 'productTypeThaiLaos')}>
-                        <option value="" disabled>เลือกประเภทสินค้า</option>
+                        <option value="">เลือกประเภทสินค้า</option>
                         <option value="เอกสาร">เอกสาร</option>
                         <option value="อาหารแห้ง">อาหารแห้ง</option>
                         <option value="ของใช้">ของใช้</option>
@@ -2072,48 +2839,105 @@ const ShippingAdd: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm mb-1">ขนาดกล่อง</label>
-                      <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="ขนาดกล่อง" />
+                      <input 
+                        type="text" 
+                        className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-gray-50" 
+                        placeholder="ขนาดกล่อง" 
+                        value={
+                          formDataThaiLaos.widthThaiLaos && formDataThaiLaos.lengthThaiLaos && formDataThaiLaos.heightThaiLaos
+                            ? `${parseFloat(formDataThaiLaos.widthThaiLaos || '0') * parseFloat(formDataThaiLaos.lengthThaiLaos || '0') * parseFloat(formDataThaiLaos.heightThaiLaos || '0')} ซม.`
+                            : '0 ซม.'
+                        }
+                        readOnly
+                      />
                     </div>
                     <div>
-                      <label className="block text-sm mb-1">ราคาที่คำนวนได้ (บาท)</label>
-                      <input type="number" className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="ราคา" readOnly/>
+                      <label className="block text-sm mb-1">ราคาที่คำนวนได้ (LAK)</label>
+                      <input 
+                        type="text" 
+                        className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-gray-50" 
+                        placeholder="ราคา" 
+                        value={
+                          selectedLaoTransporter === "Mixay" 
+                            ? (mixayCalculatedPriceThaiLaos !== null 
+                                ? formatNumberWithCommas(mixayCalculatedPriceThaiLaos) 
+                                : "กำลังคำนวณ...")
+                            : "0"
+                        }
+                        readOnly
+                      />
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mt-4">
-                  {/* ด้านซ้าย: อัตราแลกเปลี่ยน */}
-                  <div className="bg-white p-4 rounded-lg shadow">
-                    <h2 className="text-lg font-bold mb-2">อัตราแลกเปลี่ยน</h2>
-                    <p className="text-sm font-medium mb-2 text-gray-600">ลาว ซื้อ ไทย</p>
-                    <div className="bg-yellow-100 p-4 rounded-lg text-center">
-                      {/* แสดงจำนวนเงินกีบลาว */}
-                      <p className="text-xl font-bold text-[#E52525]">
-                        {formatNumberWithCommas(50000)} กีบ
-                      </p>
-                    </div>
-                  </div>
+                <div className="gap-4 mt-4">
+                  {(() => {
+                    // 🔥 สร้างตัวแปรคำนวณค่าต่างๆ
+                    const crossingFeeInBaht = calculateShippingPrice();
+                    const crossingFeeInKip = Math.round(crossingFeeInBaht * 650 * 1.02);
+                    
+                    let shippingFeeInBaht = 0;
+                    let shippingFeeInKip = 0;
+                    let totalBaht = 0;
+                    let totalKip = 0;
+                    
+                    if (selectedLaoTransporter === "Mixay" && mixayCalculatedPriceThaiLaos !== null) {
+                      // คำนวณสำหรับ Mixay
+                      const adjustedRate = 650 * 0.98; // 637
+                      shippingFeeInBaht = parseFloat((mixayCalculatedPriceThaiLaos / adjustedRate).toFixed(2));
+                      shippingFeeInKip = mixayCalculatedPriceThaiLaos;
+                      totalBaht = Math.round(shippingFeeInBaht + crossingFeeInBaht);
+                      totalKip = Math.round(shippingFeeInKip + crossingFeeInKip);
+                    } else {
+                      // คำนวณสำหรับขนส่งอื่น
+                      shippingFeeInBaht = 0;
+                      shippingFeeInKip = 0;
+                      totalBaht = shippingFeeInBaht + crossingFeeInBaht;
+                      totalKip = Math.round(crossingFeeInKip);
+                    }
 
-                  {/* ด้านขวา: ยอดที่ต้องชำระ */}
-                  <div className="bg-white p-4 rounded-lg shadow">
-                    <h2 className="text-lg font-bold mb-2">ยอดที่ต้องชำระ</h2>
-                    {/* แสดงชื่อขนส่ง */}
-                    <p className="text-sm font-medium mb-2 text-gray-600 flex items-center">
-                      <span>{selectedTransporter}</span>
-                      {selectedLaoTransporter && (
-                        <>
-                          <FaArrowRight className="mx-2 text-[#E52525]" />
-                          <span>{selectedLaoTransporter}</span>
-                        </>
-                      )}
-                    </p>
-                    <div className="bg-green-100 p-4 rounded-lg text-center">
-                      {/* แสดงจำนวนเงินที่ต้องชำระ */}
-                      <p className="text-xl font-bold text-[#E52525]">
-                        {formatNumberWithCommas(2000)} บาท
-                      </p>
-                    </div>
-                  </div>
+                    return (
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr>
+                            <th className="border border-gray-300 bg-[#E52525] text-white p-2 text-center font-bold">สกุลเงิน</th>
+                            <th className="border border-gray-300 bg-[#E52525] text-white p-2 text-center font-bold">ค่าข้าม</th>
+                            <th className="border border-gray-300 bg-[#E52525] text-white p-2 text-center font-bold">ค่าส่ง</th>
+                            <th className="border border-gray-300 bg-[#E52525] text-white p-2 text-center font-bold">ยอดรวม</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {/* แถวบาท */}
+                          <tr className="bg-white">
+                            <td className="border border-gray-300 p-2 text-center font-medium">THB</td>
+                            <td className="border border-gray-300 p-2 text-center">
+                              {formatNumberWithCommas(crossingFeeInBaht)}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center">
+                              {formatNumberWithCommas(shippingFeeInBaht)}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center font-bold text-[#E52525]">
+                              {formatNumberWithCommas(totalBaht)}
+                            </td>
+                          </tr>
+                          
+                          {/* แถวกีบ */}
+                          <tr className="bg-gray-50">
+                            <td className="border border-gray-300 p-2 text-center font-medium">LAK</td>
+                            <td className="border border-gray-300 p-2 text-center">
+                              {formatNumberWithCommas(crossingFeeInKip)}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center">
+                              {formatNumberWithCommas(shippingFeeInKip)}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-center font-bold text-[#E52525]">
+                              {formatNumberWithCommas(totalKip)}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    );
+                  })()}
                 </div>
                 
                 <div className="flex justify-between mt-4">
@@ -2125,12 +2949,120 @@ const ShippingAdd: React.FC = () => {
                   </button>
                   <button
                     className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-                    onClick={() => {
+                    onClick={async () => {
+                      console.log("🖱️ คลิกปุ่มบันทึก");
+                      console.log("🔍 selectedLaoTransporter:", selectedLaoTransporter);
+                      console.log("🔍 formDataThaiLaos:", formDataThaiLaos);
+                      
                       if (validateThaiLaosPopupInput()) {
-                        console.log("ข้อมูลที่กรอก:", formDataThaiLaos);
+                        console.log("✅ ข้อมูลที่กรอกถูกต้อง:", formDataThaiLaos);
+                        
+                        // คำนวณค่าต่างๆ ก่อนส่งออก
+                        const crossingFeeInBaht = calculateShippingPrice();
+                        const crossingFeeInKip = Math.round(crossingFeeInBaht * 650 * 1.02);
+                        
+                        let shippingFeeInBaht = 0;
+                        let totalBaht = 0;
+                        let totalKip = 0;
+                        
+                        if (selectedLaoTransporter === "Mixay" && mixayCalculatedPriceThaiLaos !== null) {
+                          // คำนวณสำหรับ Mixay
+                          const adjustedRate = 650 * 0.98; // 637
+                          shippingFeeInBaht = mixayCalculatedPriceThaiLaos / adjustedRate;
+                          totalBaht = Math.round(shippingFeeInBaht + crossingFeeInBaht);
+                          totalKip = Math.round(mixayCalculatedPriceThaiLaos + crossingFeeInKip);
+                        } else {
+                          // คำนวณสำหรับขนส่งอื่น
+                          shippingFeeInBaht = 0;
+                          totalBaht = shippingFeeInBaht + crossingFeeInBaht;
+                          totalKip = Math.round(crossingFeeInKip);
+                        }
+                        
+                        // สร้างออบเจกต์ข้อมูลที่จะส่งออก
+                        const outputData = {
+                          // ข้อมูลพื้นฐาน
+                          selectedTransporter: selectedTransporter,
+                          selectedLaoTransporter: selectedLaoTransporter,
+                          formData: formDataThaiLaos,
+                          
+                          // ข้อมูลการคำนวณราคา
+                          pricing: {
+                            // ราคาขั้นต้น
+                            mixayCalculatedPrice: mixayCalculatedPriceThaiLaos,
+                            crossingFeeInBaht: crossingFeeInBaht,
+                            crossingFeeInKip: crossingFeeInKip,
+                            shippingFeeInBaht: parseFloat(shippingFeeInBaht.toFixed(2)),
+                            
+                            // ราคารวม
+                            totalBaht: totalBaht,
+                            totalKip: totalKip,
+                            
+                            // รายละเอียดการคำนวณ
+                            calculations: {
+                              adjustedRate: 650 * 0.98, // 637
+                              exchangeRateWithFee: 650 * 1.02, // 663
+                              boxSize: parseFloat(formDataThaiLaos.widthThaiLaos || '0') + 
+                                      parseFloat(formDataThaiLaos.lengthThaiLaos || '0') + 
+                                      parseFloat(formDataThaiLaos.heightThaiLaos || '0'),
+                              weight: parseFloat(formDataThaiLaos.weightThaiLaos || '0')
+                            }
+                          },
+                          
+                          // ข้อมูลสำหรับตาราง
+                          tableData: {
+                            currency: {
+                              baht: {
+                                shippingFee: selectedLaoTransporter === "Mixay" 
+                                  ? parseFloat(shippingFeeInBaht.toFixed(2))
+                                  : 0,
+                                crossingFee: crossingFeeInBaht,
+                                total: totalBaht
+                              },
+                              lak: {
+                                shippingFee: selectedLaoTransporter === "Mixay" 
+                                  ? mixayCalculatedPriceThaiLaos 
+                                  : 0,
+                                crossingFee: crossingFeeInKip,
+                                total: totalKip
+                              }
+                            }
+                          },
+                          
+                          // timestamp
+                          timestamp: new Date().toISOString(),
+                          
+                          // สถานะ
+                          status: "calculated"
+                        };
+                        
+                        // ส่งออกข้อมูล
+                        console.log("📤 ข้อมูลที่ส่งออก (OUTPUT DATA):", outputData);
+                        console.log("💰 สรุปราคา:");
+                        console.log("- ค่าส่ง (บาท):", outputData.tableData.currency.baht.shippingFee);
+                        console.log("- ค่าข้าม (บาท):", outputData.tableData.currency.baht.crossingFee);
+                        console.log("- ยอดรวม (บาท):", outputData.tableData.currency.baht.total);
+                        console.log("- ค่าส่ง (กีบ):", outputData.tableData.currency.lak.shippingFee);
+                        console.log("- ค่าข้าม (กีบ):", outputData.tableData.currency.lak.crossingFee);
+                        console.log("- ยอดรวม (กีบ):", outputData.tableData.currency.lak.total);
+                        
+                        // เรียก API ตามขนส่งที่เลือก
+                        if (selectedLaoTransporter === "Mixay") {
+                          console.log("🚀 เรียก API Mixay...");
+                          await addMixayParcelThaiLaos(); // เรียก API Mixay
+                        } else {
+                          console.log("ℹ️ ไม่ใช่ Mixay - ไม่เรียก API");
+                        }
+                        
+                        // ปิด popup และรีเซ็ตฟอร์ม
                         closePopupThaiLaos();
+                        resetFormThaiLaos();
+                        
+                        // คุณสามารถส่งข้อมูลไปยัง parent component หรือ API ได้ที่นี่
+                        // เช่น: onSubmit(outputData) หรือ saveToDatabase(outputData)
+                        
                       } else {
-                        console.log("ข้อมูลไม่ครบถ้วนหรือไม่ถูกต้อง");
+                        console.log("❌ ข้อมูลไม่ครบถ้วนหรือไม่ถูกต้อง");
+                        console.log("🔍 errorsThaiLaos:", errorsThaiLaos);
                       }
                     }}
                   >
@@ -2209,7 +3141,6 @@ const ShippingAdd: React.FC = () => {
                                onClick={() => {
                                   setFormDataLaos((prev) => ({ ...prev, senderProvincestLaos: province.pr_name, }));
                                   setSearchTerm(province.pr_name);
-                                  setSelectedProvinceId(province.pr_id); // อัปเดต selectedProvinceId
                                   setDropdownOpen(false);
                                 }}
                               >
@@ -2226,60 +3157,14 @@ const ShippingAdd: React.FC = () => {
 
                     <div className="mb-1">
                       <label className="block text-sm mb-1">เมือง</label>
-                      <div className="relative">
-                        <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="ค้นหาและเลือกเมือง" value={districtSearchTerm}
-                          onChange={(e) => setDistrictSearchTerm(e.target.value)}
-                          onFocus={() => setDistrictDropdownOpen(true)}
-                          onBlur={() => setTimeout(() => setDistrictDropdownOpen(false), 200)}
-                        />
-                        {districtDropdownOpen && filteredDistricts.length > 0 && (
-                          <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 max-h-40 overflow-y-auto w-full">
-                            {filteredDistricts.map((district) => (
-                              <div key={district.dr_id} className="p-2 hover:bg-gray-100 cursor-pointer"
-                                onClick={() => {
-                                  setFormDataLaos((prev) => ({ ...prev, senderDistricLaos: district.dr_name, }));
-                                  setDistrictSearchTerm(district.dr_name);
-                                  setSelectedDistrictId(district.dr_id);
-                                  setDistrictDropdownOpen(false);
-                                }}
-                              >
-                                {district.dr_name}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {errorsLaos.senderDistricLaos && ( <p className="text-red-500 text-sm mt-1">{errorsLaos.senderDistricLaos}</p> )}
-                      </div>
+                      <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="เมืองผู้ส่ง" value={formDataLaos.senderDistricLaos} onChange={(e) => handleLaosInputChange(e, 'senderDistricLaos')}/>
+                      {errorsLaos.senderDistricLaos && (<p className="text-red-500 text-sm mt-1">{errorsLaos.senderDistricLaos}</p>)}
                     </div>
                   </div>
                   <div className="mb-1">
                     <label className="block text-sm mb-1">บ้าน</label>
-                    <div className="relative">
-                      {/* Input สำหรับค้นหา */}
-                      <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="ค้นหาและเลือกบ้าน" value={villagesSearchTerm}
-                        onChange={(e) => setvillagesSearchTerm(e.target.value)} // อัปเดตคำค้นหา
-                        onFocus={() => setvillagesDropdownOpen(true)} // เปิด dropdown เมื่อโฟกัส
-                        onBlur={() => setTimeout(() => setvillagesDropdownOpen(false), 200)} // ปิด dropdown เมื่อ blur
-                      />
-                      {/* Dropdown แสดงผลลัพธ์ */}
-                      {villagesDropdownOpen && filteredVillages.length > 0 && (
-                        <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 max-h-40 overflow-y-auto w-full">
-                          {filteredVillages.map((village) => (
-                            <div key={village.vill_id} className="p-2 hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
-                                setFormDataLaos((prev) => ({ ...prev, senderVillagesLaos: village.vill_name,  }));
-                                setvillagesSearchTerm(village.vill_name); // อัปเดตคำค้นหา
-                                setvillagesDropdownOpen(false); // ปิด dropdown
-                              }}
-                            >
-                              {village.vill_name}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {/* แสดงข้อความแจ้งเตือนหากมีข้อผิดพลาด */}
-                      {errorsLaos.senderVillagesLaos && ( <p className="text-red-500 text-sm mt-1">{errorsLaos.senderVillagesLaos}</p> )}
-                    </div>
+                    <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="บ้านผู้ส่ง" value={formDataLaos.senderVillagesLaos} onChange={(e) => handleLaosInputChange(e, 'senderVillagesLaos')}/>
+                    {errorsLaos.senderVillagesLaos && (<p className="text-red-500 text-sm mt-1">{errorsLaos.senderVillagesLaos}</p>)}
                   </div>
                 </div>
 
@@ -2349,7 +3234,6 @@ const ShippingAdd: React.FC = () => {
                                 onClick={() => {
                                   setFormDataLaos((prev) => ({ ...prev, receiverDistricLaos: district.dr_name, }));
                                   setReceiverDistrictSearchTerm(district.dr_name);
-                                  setReceiverSelectedDistrictId(district.dr_id);
                                   setReceiverDistrictDropdownOpen(false);
                                 }}
                               >
@@ -2365,71 +3249,13 @@ const ShippingAdd: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4 mb-1">
                     <div className="mb-1">
                       <label className="block text-sm mb-1">บ้าน</label>
-                      <div className="relative">
-                        <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="ค้นหาและเลือกบ้าน" value={receiverVillagesSearchTerm}
-                          onChange={(e) => setReceiverVillagesSearchTerm(e.target.value)}
-                          onFocus={() => setReceiverVillagesDropdownOpen(true)}
-                          onBlur={() => setTimeout(() => setReceiverVillagesDropdownOpen(false), 200)}
-                        />
-                        {receiverVillagesDropdownOpen && filteredReceiverVillages.length > 0 && (
-                          <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 max-h-40 overflow-y-auto w-full">
-                            {filteredReceiverVillages.map((village) => (
-                              <div key={village.vill_id} className="p-2 hover:bg-gray-100 cursor-pointer"
-                                onClick={() => {
-                                  setFormDataLaos((prev) => ({ ...prev, receiverVillagesLaos: village.vill_name, }));
-                                  setReceiverVillagesSearchTerm(village.vill_name);
-                                  setSelectedReceiverVillageId(village.vill_id);
-                                  setReceiverVillagesDropdownOpen(false);
-                                }}
-                              >
-                                {village.vill_name}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {errorsLaos.receiverVillagesLaos && ( <p className="text-red-500 text-sm mt-1">{errorsLaos.receiverVillagesLaos}</p> )}
-                      </div>
+                      <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="บ้านผู้รับ" value={formDataLaos.receiverVillagesLaos} onChange={(e) => handleLaosInputChange(e, 'receiverVillagesLaos')}/>
+                      {errorsLaos.receiverVillagesLaos && (<p className="text-red-500 text-sm mt-1">{errorsLaos.receiverVillagesLaos}</p>)}
                     </div>
                     <div className="mb-1">
                       <label className="block text-sm mb-1">สาขา</label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          className="w-full border border-gray-300 rounded-lg p-2 text-sm"
-                          placeholder="ค้นหาและเลือกสาขา"
-                          value={receiverBranchSearchTerm}
-                          onChange={e => setReceiverBranchSearchTerm(e.target.value)}
-                          onFocus={() => setReceiverBranchDropdownOpen(true)}
-                          onBlur={() => setTimeout(() => setReceiverBranchDropdownOpen(false), 200)}
-                        />
-                        {receiverBranchDropdownOpen && filteredReceiverBranches.length > 0 && (
-                          <div className="absolute z-10 bg-white border border-gray-300 rounded-lg mt-1 max-h-40 overflow-y-auto w-full">
-                            {filteredReceiverBranches.map(branch => (
-                              <div
-                                key={branch.id}
-                                className="p-2 hover:bg-gray-100 cursor-pointer"
-                                onClick={() => {
-                                  setFormDataLaos(prev => ({
-                                    ...prev,
-                                    receiverBranchLaos: branch.name, // แสดงชื่อใน input
-                                    receiverBranchLaosId: branch.id, // เก็บ id สำหรับส่งออก (เพิ่ม field ใน formDataLaos ด้วย)
-                                    receiverProvinceId: branch.province_id,
-                                    receiverDistrictId: branch.district_id,
-                                    receiverVillageId: branch.village_id,
-                                  }));
-                                  setReceiverBranchSearchTerm(branch.name);
-                                  setReceiverBranchDropdownOpen(false);
-                                }}
-                              >
-                                {branch.name}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {errorsLaos.receiverBranchLaos && (
-                          <p className="text-red-500 text-sm mt-1">{errorsLaos.receiverBranchLaos}</p>
-                        )}
-                      </div>
+                      <input type="text" className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="สาขาผู้รับ" value={formDataLaos.receiverBranchLaos} onChange={(e) => handleLaosInputChange(e, 'receiverBranchLaos')}/>
+                      {errorsLaos.receiverBranchLaos && (<p className="text-red-500 text-sm mt-1">{errorsLaos.receiverBranchLaos}</p>)}
                     </div>
                   </div>
                 </div>
@@ -2442,7 +3268,7 @@ const ShippingAdd: React.FC = () => {
                   <div>
                     <label className="block text-sm mb-1">ประเภทสินค้า</label>
                     <select className="w-full border border-gray-300 rounded-lg p-2 text-sm" value={formDataLaos.productTypeLaos} onChange={(e) => handleLaosInputChange(e, 'productTypeLaos')}>
-                      <option value="" disabled>
+                      <option value="">
                         เลือกประเภทสินค้า
                       </option>
                       <option value="เอกสาร">เอกสาร</option>
@@ -2524,7 +3350,18 @@ const ShippingAdd: React.FC = () => {
                       closePopupLaos();
                     } else {
                       console.log("ข้อมูลไม่ครบถ้วนหรือไม่ถูกต้อง");
-                      console.log(formDataLaos);
+                      console.log("ข้อมูลที่กรอก:", formDataLaos);
+                      console.log("ฟิลด์ที่ขาดหาย:", {
+                        senderVillagesLaos: formDataLaos.senderVillagesLaos || "❌ ไม่ได้กรอกบ้านผู้ส่ง",
+                        senderDistricLaos: formDataLaos.senderDistricLaos || "❌ ไม่ได้กรอกเมืองผู้ส่ง",
+                        receiverVillagesLaos: formDataLaos.receiverVillagesLaos || "❌ ไม่ได้กรอกบ้านผู้รับ",
+                        receiverBranchLaos: formDataLaos.receiverBranchLaos || "❌ ไม่ได้กรอกสาขาผู้รับ"
+                      });
+                      console.log("กรุณากรอกข้อมูลให้ครบถ้วน:");
+                      console.log("- บ้านผู้ส่ง");
+                      console.log("- เมืองผู้ส่ง");
+                      console.log("- บ้านผู้รับ");
+                      console.log("- สาขาผู้รับ");
                     }
                   }}
                 >
@@ -2695,7 +3532,7 @@ const ShippingAdd: React.FC = () => {
                     <div>
                       <label className="block text-sm mb-1">ประเภทสินค้า</label>
                       <select className="w-full border border-gray-300 rounded-lg p-2 text-sm" value={formDataLaosThai.productTypeLaosThai} onChange={(e) => handleLaosThaiInputChange(e, 'productTypeLaosThai')}>
-                        <option value="" disabled>เลือกประเภทสินค้า</option>
+                        <option value="">เลือกประเภทสินค้า</option>
                         <option value="เอกสาร">เอกสาร</option>
                         <option value="อาหารแห้ง">อาหารแห้ง</option>
                         <option value="ของใช้">ของใช้</option>
@@ -2777,7 +3614,7 @@ const ShippingAdd: React.FC = () => {
                     <div className="bg-green-100 p-4 rounded-lg text-center">
                       {/* แสดงจำนวนเงินที่ต้องชำระ */}
                       <p className="text-xl font-bold text-[#E52525]">
-                        {formatNumberWithCommas(2000)} บาท
+                        {formatNumberWithCommas(0)} บาท
                       </p>
                     </div>
                   </div>
@@ -2807,7 +3644,186 @@ const ShippingAdd: React.FC = () => {
         </>
       )}
 
+      {showPaymentPopup && (
+        <>
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50"></div>
+          <div className="fixed top-1/2 left-1/2 z-50 bg-white rounded-lg shadow-lg p-8 w-[350px] -translate-x-1/2 -translate-y-1/2">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">รับชำระเงิน</h2>
+              <div className="flex gap-2">
+                <button
+                  className={`px-3 py-1 rounded font-bold border ${paymentCurrency === 'THB' ? 'bg-green-500 text-white border-green-600' : 'bg-gray-100 text-gray-700 border-gray-300'}`}
+                  onClick={() => {
+                    setPaymentCurrency('THB');
+                    setReceivedAmount('');
+                  }}
+                >
+                  บาท
+                </button>
+                <button
+                  className={`px-3 py-1 rounded font-bold border ${paymentCurrency === 'LAK' ? 'bg-green-500 text-white border-green-600' : 'bg-gray-100 text-gray-700 border-gray-300'}`}
+                  onClick={() => {
+                    setPaymentCurrency('LAK');
+                    setReceivedAmount('');
+                  }}
+                >
+                  กีบ
+                </button>
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="block mb-1 font-medium">ยอดที่ต้องชำระ</label>
+              <div className="text-2xl font-bold text-[#E52525] mb-2">
+                {formatNumberWithCommas(paymentCurrency === 'THB' ? totalTHB : totalLAK)}
+                {paymentCurrency === 'THB' ? ' บาท' : ' กีบ'}
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="block mb-1 font-medium">จำนวนเงินที่รับมา</label>
+              <input
+                type="number"
+                className="w-full border border-gray-300 rounded-lg p-2 text-lg appearance-none"
+                placeholder={`กรอกจำนวนเงินที่รับมา (${paymentCurrency === 'THB' ? 'บาท' : 'กีบ'})`}
+                value={receivedAmount}
+                onChange={e => setReceivedAmount(e.target.value)}
+                min={0}
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block mb-1 font-medium">เงินทอน</label>
+              <div className={`text-2xl font-bold ${changeAmount < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                {receivedAmount ? formatNumberWithCommas(changeAmount) : '0'}
+                {paymentCurrency === 'THB' ? ' บาท' : ' กีบ'}
+              </div>
+              {receivedAmount && changeAmount < 0 && (
+                <div className="text-red-500 text-sm mt-1">จำนวนเงินที่รับมาต้องมากกว่าหรือเท่ากับยอดที่ต้องชำระ</div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                className="bg-red-400 text-white px-4 py-2 rounded hover:bg-red-500"
+                onClick={() => setShowPaymentPopup(false)}
+              >
+                ยกเลิก
+              </button>
+              <button
+                className={`px-4 py-2 rounded font-bold ${!receivedAmount || changeAmount < 0 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-600'}`}
+                disabled={!receivedAmount || changeAmount < 0}
+                onClick={() => {
+                  // บันทึกข้อมูลการชำระเงิน
+                  setPaymentData({
+                    totalAmount: totalAmount,
+                    receivedAmount: parseFloat(receivedAmount),
+                    changeAmount: changeAmount,
+                    currency: paymentCurrency,
+                    timestamp: new Date().toISOString()
+                  });
+                  
+                  setShowPaymentPopup(false);
+                  setReceivedAmount('');
+                  setShowPrintPopup(true);
+                }}
+              >
+                ยืนยัน
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {showPrintPopup && (
+        <>
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50"></div>
+          <div className="fixed top-1/2 left-1/2 z-50 bg-white rounded-lg shadow-lg p-8 w-[400px] -translate-x-1/2 -translate-y-1/2">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold text-green-600 mb-2">ชำระเงินสำเร็จ!</h2>
+              <p className="text-gray-600">เลือกการพิมพ์เอกสาร</p>
+            </div>
+            
+            <div className="space-y-4">
+              <button
+                className="w-full bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 flex items-center justify-center gap-2 text-lg font-medium"
+                onClick={async () => {
+                  try {
+                    await printReceipt(
+                      paymentData,
+                      parcelData,
+                      employeeData,
+                      formatNumberWithCommas
+                    );
+                    console.log("พิมพ์ใบเสร็จสำเร็จ - กลับสู่หน้าเลือกพิมพ์");
+                    // หน้านี้จะยังคงแสดงอยู่หลังจากพิมพ์เสร็จ
+                  } catch (error) {
+                    console.error("เกิดข้อผิดพลาดในการพิมพ์:", error);
+                  }
+                }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                สั่งพิมพ์ใบเสร็จ
+              </button>
+              
+              <button
+                className="w-full bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 flex items-center justify-center gap-2 text-lg font-medium"
+                onClick={async () => {
+                  try {
+                    console.log("🖨️ เริ่มสร้างใบประหน้า...");
+                    
+                    // แปลงข้อมูล parcelData เป็น CoverSheetParcelData
+                    const coverSheetData: CoverSheetParcelData[] = parcelData.map(item => ({
+                      parcelNumber: item.parcelNumber,
+                      deliveryType: item.deliveryType,
+                      senderName: item.senderName,
+                      senderAddress: item.senderAddress,
+                      receiverName: item.receiverName,
+                      receiverAddress: item.receiverAddress,
+                      weight: item.weight,
+                      width: item.width,
+                      length: item.length,
+                      height: item.height,
+                      senderPhone: item.senderPhone,
+                      receiverPhone: item.receiverPhone
+                    }));
+
+                    // พิมพ์ใบประหน้า
+                    await printCoverSheet(
+                      coverSheetData,
+                      employeeData,
+                      formatNumberWithCommas
+                    );
+                    
+                    console.log("✅ พิมพ์ใบประหน้าสำเร็จ");
+                    
+                  } catch (error) {
+                    console.error("❌ เกิดข้อผิดพลาดในการพิมพ์ใบประหน้า:", error);
+                    alert("เกิดข้อผิดพลาดในการพิมพ์ใบประหน้า");
+                  }
+                }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                สั่งพิมพ์ใบประหน้า
+              </button>
+              
+              <button
+                className="w-full bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 text-lg font-medium"
+                onClick={() => {
+                  setShowPrintPopup(false);
+                  // ล้างข้อมูลพัสดุหลังจากชำระเงินเสร็จ
+                  setParcelData([]);
+                }}
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
     </div>
+    
   );
 };
 
